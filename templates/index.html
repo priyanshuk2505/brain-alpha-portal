@@ -100,10 +100,14 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                     <div class="form-group">
                         <label>Universe</label>
                         <select id="settingUniverse" class="form-control">
-                            <option value="TOP3000" selected>TOP3000</option>
-                            <option value="TOP2000">TOP2000</option>
-                            <option value="TOP1000">TOP1000</option>
-                            <option value="TOP500">TOP500</option>
+                            <option value="TOP3000" selected>TOP3000 (Top 3000 US)</option>
+                            <option value="TOP2000">TOP2000 (Top 2000 US)</option>
+                            <option value="TOP1000">TOP1000 (Top 1000 US)</option>
+                            <option value="TOP500">TOP500 (Top 500 Large Cap)</option>
+                            <option value="TOP200">TOP200 (Top 200 Large Cap)</option>
+                            <option value="TOP100">TOP100 (Top 100 Mega Cap)</option>
+                            <option value="ILLIQUID">ILLIQUID (Small & Illiquid)</option>
+                            <option value="ALL_EQUITIES">ALL_EQUITIES (All US Equities)</option>
                         </select>
                     </div>
 
@@ -111,26 +115,23 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                         <label>Neutralization</label>
                         <select id="settingNeutralization" class="form-control">
                             <option value="INDUSTRY" selected>INDUSTRY</option>
-                            <option value="MARKET">MARKET</option>
                             <option value="SUBINDUSTRY">SUBINDUSTRY</option>
                             <option value="SECTOR">SECTOR</option>
+                            <option value="MARKET">MARKET</option>
+                            <option value="STATBND">STATBND</option>
                             <option value="NONE">NONE</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Language</label>
-                        <select id="settingLanguage" class="form-control">
-                            <option value="FASTEXPR" selected>FASTEXPR</option>
-                            <option value="PYTHON">PYTHON</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label>Delay</label>
                         <select id="settingDelay" class="form-control">
-                            <option value="1" selected>1</option>
-                            <option value="0">0</option>
+                            <option value="1" selected>Delay 1 (Next Day)</option>
+                            <option value="0">Delay 0 (Same Day)</option>
+                            <option value="2">Delay 2 (2 Days)</option>
+                            <option value="3">Delay 3 (3 Days)</option>
+                            <option value="5">Delay 5 (5 Days)</option>
+                            <option value="10">Delay 10 (10 Days)</option>
                         </select>
                     </div>
 
@@ -140,15 +141,61 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                             <option value="2" selected>2</option>
                             <option value="0">0</option>
                             <option value="3">3</option>
+                            <option value="4">4</option>
                             <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="8">8</option>
                             <option value="10">10</option>
                             <option value="15">15</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Region</label>
+                        <select id="settingRegion" class="form-control">
+                            <option value="USA" selected>USA (United States)</option>
+                            <option value="EUR">EUR (Europe)</option>
+                            <option value="ASI">ASI (Asia-Pacific)</option>
+                            <option value="GLB">GLB (Global)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label>Truncation</label>
-                        <input type="number" id="settingTruncation" class="form-control" value="0.08" step="0.01">
+                        <input type="number" id="settingTruncation" class="form-control" value="0.08" step="0.01" min="0.01" max="0.5">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pasteurization</label>
+                        <select id="settingPasteurization" class="form-control">
+                            <option value="ON" selected>ON</option>
+                            <option value="OFF">OFF</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>NaN Handling</label>
+                        <select id="settingNanHandling" class="form-control">
+                            <option value="ON" selected>ON</option>
+                            <option value="OFF">OFF</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Unit Handling</label>
+                        <select id="settingUnitHandling" class="form-control">
+                            <option value="VERIFY" selected>VERIFY</option>
+                            <option value="OFF">OFF</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Language</label>
+                        <select id="settingLanguage" class="form-control">
+                            <option value="FASTEXPR" selected>FASTEXPR</option>
+                            <option value="PYTHON">PYTHON</option>
+                        </select>
                     </div>
                 </div>
 
@@ -198,12 +245,15 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
             <!-- Historical & Batch Results Explorer -->
             <div class="card glass-card margin-top">
                 <div class="card-header flex-wrap">
-                    <h2><i class="fa-solid fa-chart-line"></i> Results Explorer</h2>
+                    <div class="header-title-group">
+                        <h2><i class="fa-solid fa-chart-line"></i> Results Explorer</h2>
+                        <span id="resultsCountBadge" class="badge badge-purple">0 Alphas</span>
+                    </div>
                     
                     <div class="filter-controls">
                         <div class="search-box">
                             <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                            <input type="text" id="searchInput" placeholder="Search expression or code...">
+                            <input type="text" id="searchInput" placeholder="Search code, settings, ID...">
                         </div>
 
                         <select id="filterStatus" class="form-control filter-dropdown">
@@ -213,15 +263,41 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                             <option value="FAILED">FAILED Only</option>
                         </select>
 
+                        <select id="filterUniverse" class="form-control filter-dropdown">
+                            <option value="ALL">All Universes</option>
+                            <option value="TOP3000">TOP3000</option>
+                            <option value="TOP2000">TOP2000</option>
+                            <option value="TOP1000">TOP1000</option>
+                            <option value="TOP500">TOP500</option>
+                            <option value="TOP200">TOP200</option>
+                            <option value="TOP100">TOP100</option>
+                            <option value="ILLIQUID">ILLIQUID</option>
+                        </select>
+
+                        <select id="filterNeutralization" class="form-control filter-dropdown">
+                            <option value="ALL">All Neutralizations</option>
+                            <option value="INDUSTRY">INDUSTRY</option>
+                            <option value="SUBINDUSTRY">SUBINDUSTRY</option>
+                            <option value="SECTOR">SECTOR</option>
+                            <option value="MARKET">MARKET</option>
+                            <option value="STATBND">STATBND</option>
+                            <option value="NONE">NONE</option>
+                        </select>
+
                         <select id="filterSharpe" class="form-control filter-dropdown">
                             <option value="ALL">All Sharpe Ratios</option>
-                            <option value="1.0">Sharpe > 1.0 (Elite)</option>
-                            <option value="0.5">Sharpe > 0.5 (Submittable)</option>
+                            <option value="1.25">Sharpe ≥ 1.25 (Elite)</option>
+                            <option value="1.0">Sharpe ≥ 1.0 (High)</option>
+                            <option value="0.5">Sharpe ≥ 0.5 (Submittable)</option>
+                            <option value="0.0">Sharpe > 0 (Positive)</option>
                         </select>
 
                         <div class="btn-group-sm">
-                            <button id="exportCsvBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-csv"></i> CSV</button>
-                            <button id="exportEliteBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-star"></i> Elite Alphas</button>
+                            <button id="toggleEliteBtn" class="btn btn-warning btn-sm" title="Show only Elite Alphas (Sharpe >= 1.25)">
+                                <i class="fa-solid fa-star"></i> Elite Alphas Only
+                            </button>
+                            <button id="exportCsvBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+                            <button id="exportEliteBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-download"></i> Download Elite .txt</button>
                         </div>
                     </div>
                 </div>
@@ -231,21 +307,23 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                     <table class="data-table" id="resultsTable">
                         <thead>
                             <tr>
+                                <th style="width: 30px;"></th>
                                 <th data-sort="status">Status <i class="fa-solid fa-sort"></i></th>
                                 <th data-sort="sharpe">Sharpe <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="fitness">Fitness <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="fitness">Fitness <i class="fa-sort"></i></th>
                                 <th data-sort="returns">Returns % <i class="fa-solid fa-sort"></i></th>
                                 <th data-sort="drawdown">Drawdown % <i class="fa-solid fa-sort"></i></th>
                                 <th data-sort="margin">Margin (bps) <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="turnover">Turnover % <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="turnover">Turnover % <i class="fa-sort"></i></th>
                                 <th data-sort="universe">Universe</th>
+                                <th data-sort="delay">Delay</th>
                                 <th>Expression Code</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="resultsTableBody">
                             <tr>
-                                <td colspan="10" class="text-center">Loading simulation results...</td>
+                                <td colspan="12" class="text-center">Loading simulation results...</td>
                             </tr>
                         </tbody>
                     </table>

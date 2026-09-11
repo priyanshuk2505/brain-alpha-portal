@@ -332,17 +332,26 @@ def log_result_to_csv(result, expression, settings):
         delay = settings.get("delay", 1)
         decay = settings.get("decay", 2)
         neutralization = settings.get("neutralization", "INDUSTRY")
+        region = settings.get("region", "USA")
+        truncation = settings.get("truncation", 0.08)
+        pasteurization = settings.get("pasteurization", "ON")
+        nan_handling = settings.get("nanHandling", "ON")
+        unit_handling = settings.get("unitHandling", "VERIFY")
+        language = settings.get("language", "FASTEXPR")
         
         with open(RESULTS_CSV, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             if not file_exists:
                 writer.writerow([
                     "Status", "Sharpe", "Fitness", "Returns(%)", "Drawdown(%)",
-                    "Margin(bps)", "Turnover(%)", "Universe", "Delay", "Decay", "Neutralization", "FailedChecks", "Code"
+                    "Margin(bps)", "Turnover(%)", "Universe", "Delay", "Decay",
+                    "Neutralization", "Region", "Truncation", "Pasteurization",
+                    "NanHandling", "UnitHandling", "Language", "FailedChecks", "Code"
                 ])
             writer.writerow([
                 status, sharpe, fitness, returns, drawdown, margin, turnover,
-                universe, delay, decay, neutralization, checks_str, expression
+                universe, delay, decay, neutralization, region, truncation,
+                pasteurization, nan_handling, unit_handling, language, checks_str, expression
             ])
             
         # Check for Elite logging condition
@@ -350,13 +359,14 @@ def log_result_to_csv(result, expression, settings):
             s_val = float(metrics.get("sharpe", 0))
             f_val = float(metrics.get("fitness", 0))
             m_val = float(metrics.get("margin", 0))
-            if s_val > 1.0 and f_val > 1.0 and m_val > 0.00015:
+            if s_val >= 1.0 and f_val >= 1.0 and m_val >= 0.0001:
                 with open(ELITE_FILE, "a", encoding="utf-8") as f_elite:
                     f_elite.write(f"Code: {expression}\n")
-                    f_elite.write(f"Sharpe: {s_val:.4f}, Fitness: {f_val:.4f}, Returns: {returns}%, Margin(bps): {margin}, Turnover: {turnover}%, Universe: {universe}, Decay: {decay}\n")
-                    f_elite.write("-" * 50 + "\n")
+                    f_elite.write(f"Sharpe: {s_val:.4f}, Fitness: {f_val:.4f}, Returns: {returns}%, Margin(bps): {margin}, Turnover: {turnover}%, Universe: {universe}, Delay: {delay}, Neutralization: {neutralization}\n")
+                    f_elite.write("-" * 60 + "\n")
     except Exception as e:
         print(f"Error logging to CSV: {e}")
+
 
 # -----------------------------------------------------------------------------
 # Background Queue Worker Thread
@@ -595,15 +605,17 @@ def get_alpha_pnl(alpha_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/simulations/submit", methods=["POST"])
-def submit_alpha_endpoint():
-    data = request.get_json() or {}
-    alpha_id = data.get("alpha_id")
-    dry_run = data.get("dry_run", False)
-    if not alpha_id:
-        return jsonify({"error": "alpha_id is required"}), 400
-    ok, msg = submit_alpha_to_brain(alpha_id, dry_run=dry_run)
-    return jsonify({"success": ok, "message": msg})
+@app.route("/api/export/csv", methods=["GET"])
+def export_csv():
+    if os.path.exists(RESULTS_CSV):
+        return send_from_directory(WORKSPACE_DIR, "simulation_results.csv", as_attachment=True)
+    return jsonify({"error": "No simulation results file found"}), 404
+
+@app.route("/api/export/elite", methods=["GET"])
+def export_elite():
+    if os.path.exists(ELITE_FILE):
+        return send_from_directory(WORKSPACE_DIR, "elite_alphas.txt", as_attachment=True)
+    return jsonify({"error": "No elite alphas logged yet"}), 404
 
 if __name__ == "__main__":
     port = 8080

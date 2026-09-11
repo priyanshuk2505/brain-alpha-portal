@@ -5,7 +5,7 @@ from Foundation import NSURL
 import AppKit
 
 os.makedirs('rendered_slides', exist_ok=True)
-pdf_path = 'SIH_2026_MARIS_TRACER_PS26143.pdf'
+pdf_path = os.path.abspath('SIH_2026_MARIS_TRACER_PS26143.pdf')
 
 doc = PDFDocument.alloc().initWithURL_(NSURL.fileURLWithPath_(pdf_path))
 num_pages = doc.pageCount()

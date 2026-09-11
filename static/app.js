@@ -1,7 +1,8 @@
 /**
  * WorldQuant BRAIN Batch Alpha Portal - Application Logic
  * Modern SPA controller for batch alpha simulations, job queue monitoring,
- * results table filtering/sorting, PnL visualization, and export utilities.
+ * compound multi-filtering, expanded settings options, expandable row details,
+ * Chart.js PnL visualization, and Elite Alphas export utilities.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let sortColumn = 'sharpe';
     let sortAscending = false;
     let pollTimer = null;
+    let isEliteOnlyFilter = false;
+    let expandedRowHashes = new Set();
 
     // -------------------------------------------------------------------------
     // DOM Elements
@@ -43,7 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
         settingLanguage: document.getElementById('settingLanguage'),
         settingDelay: document.getElementById('settingDelay'),
         settingDecay: document.getElementById('settingDecay'),
+        settingRegion: document.getElementById('settingRegion'),
         settingTruncation: document.getElementById('settingTruncation'),
+        settingPasteurization: document.getElementById('settingPasteurization'),
+        settingNanHandling: document.getElementById('settingNanHandling'),
+        settingUnitHandling: document.getElementById('settingUnitHandling'),
         settingDryRun: document.getElementById('settingDryRun'),
         settingAutoSubmit: document.getElementById('settingAutoSubmit'),
 
@@ -55,10 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
         queueStatsBadge: document.getElementById('queueStatsBadge'),
         activeQueueContainer: document.getElementById('activeQueueContainer'),
 
-        // Results Explorer
+        // Results Explorer Filters & Controls
+        resultsCountBadge: document.getElementById('resultsCountBadge'),
         searchInput: document.getElementById('searchInput'),
         filterStatus: document.getElementById('filterStatus'),
+        filterUniverse: document.getElementById('filterUniverse'),
+        filterNeutralization: document.getElementById('filterNeutralization'),
         filterSharpe: document.getElementById('filterSharpe'),
+        toggleEliteBtn: document.getElementById('toggleEliteBtn'),
         exportCsvBtn: document.getElementById('exportCsvBtn'),
         exportEliteBtn: document.getElementById('exportEliteBtn'),
         resultsTableBody: document.getElementById('resultsTableBody'),
@@ -105,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         checkAuthStatus();
         fetchQueueAndResults();
 
-        // Polling every 4 seconds for active queues and results updates
+        // Polling every 4 seconds for queue and results updates
         pollTimer = setInterval(fetchQueueAndResults, 4000);
     }
 
@@ -177,10 +188,28 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Search & Filters
+        // Search & Multi-Filter Event Listeners
         if (elements.searchInput) elements.searchInput.addEventListener('input', renderResultsTable);
         if (elements.filterStatus) elements.filterStatus.addEventListener('change', renderResultsTable);
+        if (elements.filterUniverse) elements.filterUniverse.addEventListener('change', renderResultsTable);
+        if (elements.filterNeutralization) elements.filterNeutralization.addEventListener('change', renderResultsTable);
         if (elements.filterSharpe) elements.filterSharpe.addEventListener('change', renderResultsTable);
+
+        // Toggle Elite Alphas Only Button
+        if (elements.toggleEliteBtn) {
+            elements.toggleEliteBtn.addEventListener('click', () => {
+                isEliteOnlyFilter = !isEliteOnlyFilter;
+                if (isEliteOnlyFilter) {
+                    elements.toggleEliteBtn.classList.add('active');
+                    elements.toggleEliteBtn.innerHTML = `<i class="fa-solid fa-star text-gold"></i> Showing Elite Only`;
+                    showNotification('Filtered for Elite Alphas (Sharpe ≥ 1.25)', 'info');
+                } else {
+                    elements.toggleEliteBtn.classList.remove('active');
+                    elements.toggleEliteBtn.innerHTML = `<i class="fa-solid fa-star"></i> Elite Alphas Only`;
+                }
+                renderResultsTable();
+            });
+        }
 
         // Sorting Headers
         document.querySelectorAll('#resultsTable th[data-sort]').forEach(th => {
@@ -305,15 +334,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const current = elements.batchInput.value.trim();
             elements.batchInput.value = current ? `${current}\n${lines.join('\n')}` : lines.join('\n');
             showNotification(`Loaded ${lines.length} expressions from ${file.name}`, 'success');
-
-            // Switch to editor tab
             elements.tabBtns[0].click();
         };
         reader.readAsText(file);
     }
 
     // -------------------------------------------------------------------------
-    // Launch Batch Simulation
+    // Launch Batch Simulation with Full Settings
     // -------------------------------------------------------------------------
     async function handleLaunchBatch() {
         const rawInput = elements.batchInput.value.trim();
@@ -322,7 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Parse expressions
         let expressions = [];
         if (rawInput.startsWith('[')) {
             try {
@@ -344,10 +370,14 @@ document.addEventListener('DOMContentLoaded', () => {
             settings: {
                 universe: elements.settingUniverse.value,
                 neutralization: elements.settingNeutralization.value,
-                language: elements.settingLanguage.value,
                 delay: parseInt(elements.settingDelay.value, 10),
                 decay: parseInt(elements.settingDecay.value, 10),
+                region: elements.settingRegion.value,
                 truncation: parseFloat(elements.settingTruncation.value) || 0.08,
+                pasteurization: elements.settingPasteurization.value,
+                nanHandling: elements.settingNanHandling.value,
+                unitHandling: elements.settingUnitHandling.value,
+                language: elements.settingLanguage.value,
                 dry_run: elements.settingDryRun.checked,
                 auto_submit: elements.settingAutoSubmit.checked
             }
@@ -405,9 +435,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------------------
-    // Helper to Extract Unified Item Properties
+    // Unified Item Property Extractor
     // -------------------------------------------------------------------------
-    function getItemProps(item) {
+    function getItemProps(item, idx) {
         const expr = item.code || item.expression || item.regular || '';
         const m = item.metrics || item;
         const sharpe = m.sharpe !== undefined && m.sharpe !== null ? Number(m.sharpe) : null;
@@ -416,6 +446,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const drawdown = m.drawdown !== undefined && m.drawdown !== null ? Number(m.drawdown) : null;
         const margin = m.margin !== undefined && m.margin !== null ? Number(m.margin) : null;
         const turnover = m.turnover !== undefined && m.turnover !== null ? Number(m.turnover) : null;
+
+        const hash = item.hash || item.alpha_id || `ITEM_${idx}_${expr.substring(0, 10)}`;
 
         return {
             expression: expr,
@@ -427,9 +459,18 @@ document.addEventListener('DOMContentLoaded', () => {
             margin,
             turnover,
             universe: item.universe || item.settings?.universe || 'TOP3000',
-            decay: item.decay || item.settings?.decay || 2,
-            alpha_id: item.alpha_id || item.hash || '',
-            hash: item.hash || item.alpha_id || ''
+            delay: item.delay !== undefined ? item.delay : (item.settings?.delay ?? 1),
+            decay: item.decay !== undefined ? item.decay : (item.settings?.decay ?? 2),
+            neutralization: item.neutralization || item.settings?.neutralization || 'INDUSTRY',
+            region: item.region || item.settings?.region || 'USA',
+            truncation: item.truncation || item.settings?.truncation || 0.08,
+            pasteurization: item.pasteurization || item.settings?.pasteurization || 'ON',
+            nanHandling: item.nanHandling || item.settings?.nanHandling || 'ON',
+            unitHandling: item.unitHandling || item.settings?.unitHandling || 'VERIFY',
+            language: item.language || item.settings?.language || 'FASTEXPR',
+            failed_checks: item.failed_checks || [],
+            alpha_id: item.alpha_id || hash,
+            hash: hash
         };
     }
 
@@ -451,7 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Render batch cards
         let html = '';
         currentBatches.slice(0, 5).forEach(batch => {
             const pct = batch.total > 0 ? Math.round(((batch.completed + (batch.failed || 0)) / batch.total) * 100) : 0;
@@ -482,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     <div class="job-meta">
                         <span>Universe: <strong>${batch.settings?.universe || 'TOP3000'}</strong></span>
-                        <span>Decay: <strong>${batch.settings?.decay || 2}</strong></span>
+                        <span>Delay: <strong>${batch.settings?.delay ?? 1}</strong></span>
                         <span>Neutralization: <strong>${batch.settings?.neutralization || 'INDUSTRY'}</strong></span>
                         ${batch.dry_run || batch.settings?.dry_run ? '<span class="badge badge-purple">Dry-Run</span>' : ''}
                     </div>
@@ -493,32 +533,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------------------
-    // Render Results Table
+    // Render Multi-Filtered Results Table with Details Drawers
     // -------------------------------------------------------------------------
     function renderResultsTable() {
-        let items = currentResults.map(getItemProps);
+        let items = currentResults.map((item, idx) => getItemProps(item, idx));
 
-        // Search Filter
+        // 1. Search Query Filter
         const searchTxt = elements.searchInput.value.toLowerCase().trim();
         if (searchTxt) {
             items = items.filter(item => {
                 const expr = item.expression.toLowerCase();
                 const code = item.alpha_id.toLowerCase();
-                return expr.includes(searchTxt) || code.includes(searchTxt);
+                const uni = String(item.universe).toLowerCase();
+                const neut = String(item.neutralization).toLowerCase();
+                return expr.includes(searchTxt) || code.includes(searchTxt) || uni.includes(searchTxt) || neut.includes(searchTxt);
             });
         }
 
-        // Status Filter
+        // 2. Status Filter
         const statusVal = elements.filterStatus.value;
         if (statusVal !== 'ALL') {
             items = items.filter(item => item.status === statusVal);
         }
 
-        // Sharpe Threshold Filter
+        // 3. Universe Filter
+        const universeVal = elements.filterUniverse ? elements.filterUniverse.value : 'ALL';
+        if (universeVal !== 'ALL') {
+            items = items.filter(item => String(item.universe).toUpperCase() === universeVal.toUpperCase());
+        }
+
+        // 4. Neutralization Filter
+        const neutVal = elements.filterNeutralization ? elements.filterNeutralization.value : 'ALL';
+        if (neutVal !== 'ALL') {
+            items = items.filter(item => String(item.neutralization).toUpperCase() === neutVal.toUpperCase());
+        }
+
+        // 5. Sharpe Ratio Threshold Filter
         const sharpeVal = elements.filterSharpe.value;
         if (sharpeVal !== 'ALL') {
             const minSharpe = parseFloat(sharpeVal);
             items = items.filter(item => item.sharpe !== null && item.sharpe >= minSharpe);
+        }
+
+        // 6. Elite Alphas Only Toggle Filter
+        if (isEliteOnlyFilter) {
+            items = items.filter(item => item.sharpe !== null && item.sharpe >= 1.25 && item.fitness !== null && item.fitness >= 1.0);
+        }
+
+        // Update count badge
+        if (elements.resultsCountBadge) {
+            elements.resultsCountBadge.textContent = `${items.length} Alphas`;
         }
 
         // Sort
@@ -534,24 +598,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (items.length === 0) {
             elements.resultsTableBody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center text-muted">No simulation results match the selected filters.</td>
+                    <td colspan="12" class="text-center text-muted">No simulation results match the selected compound filters.</td>
                 </tr>`;
             return;
         }
 
-        // Render first 200 items for performance
         let html = '';
         items.slice(0, 200).forEach(item => {
             const sharpeStr = item.sharpe !== null ? item.sharpe.toFixed(3) : '-';
             const fitnessStr = item.fitness !== null ? item.fitness.toFixed(3) : '-';
             
-            // Format percentage or bps
             const returnsStr = item.returns !== null ? (item.returns > 1 ? item.returns.toFixed(2) + '%' : (item.returns * 100).toFixed(2) + '%') : '-';
             const drawdownStr = item.drawdown !== null ? (Math.abs(item.drawdown) > 1 ? item.drawdown.toFixed(2) + '%' : (item.drawdown * 100).toFixed(2) + '%') : '-';
             const marginStr = item.margin !== null ? (item.margin > 1 ? item.margin.toFixed(2) : (item.margin * 10000).toFixed(2)) : '-';
             const turnoverStr = item.turnover !== null ? (item.turnover > 1 ? item.turnover.toFixed(1) + '%' : (item.turnover * 100).toFixed(1) + '%') : '-';
 
-            // Status Badge Formatting
+            // Status Badge
             let statusBadge = '';
             if (item.status === 'SUCCESS' || item.status === 'COMPLETE') {
                 statusBadge = `<span class="badge badge-green"><i class="fa-solid fa-check"></i> SUCCESS</span>`;
@@ -561,20 +623,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusBadge = `<span class="badge badge-red"><i class="fa-solid fa-triangle-exclamation"></i> FAILED</span>`;
             }
 
-            const isElite = item.sharpe !== null && item.sharpe >= 1.0 && item.fitness !== null && item.fitness >= 1.0;
+            const isElite = item.sharpe !== null && item.sharpe >= 1.25 && item.fitness !== null && item.fitness >= 1.0;
             const rowClass = isElite ? 'row-highlight-elite' : '';
+            const isExpanded = expandedRowHashes.has(item.hash);
 
             html += `
                 <tr class="${rowClass}">
+                    <td>
+                        <button class="btn-icon expand-toggle-btn" data-hash="${item.hash}">
+                            <i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+                        </button>
+                    </td>
                     <td>${statusBadge}</td>
-                    <td class="${item.sharpe >= 1.0 ? 'text-green font-bold' : ''}">${sharpeStr}</td>
+                    <td class="${item.sharpe >= 1.25 ? 'text-green font-bold' : ''}">${sharpeStr}</td>
                     <td class="${item.fitness >= 1.0 ? 'text-purple font-bold' : ''}">${fitnessStr}</td>
                     <td>${returnsStr}</td>
                     <td class="text-orange">${drawdownStr}</td>
                     <td>${marginStr}</td>
                     <td>${turnoverStr}</td>
                     <td><span class="badge badge-secondary">${item.universe}</span></td>
-                    <td class="code-cell" title="${escapeHtml(item.expression)}">${escapeHtml(truncate(item.expression, 60))}</td>
+                    <td><span class="badge badge-secondary">D${item.delay}</span></td>
+                    <td class="code-cell" title="${escapeHtml(item.expression)}">${escapeHtml(truncate(item.expression, 50))}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn btn-xs btn-secondary view-pnl-btn" data-hash="${item.hash}" data-code="${escapeHtml(item.expression)}">
@@ -586,11 +655,56 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </td>
                 </tr>`;
+
+            // Render details drawer row if expanded
+            if (isExpanded) {
+                const checksBadges = item.failed_checks.length > 0 
+                    ? item.failed_checks.map(c => `<span class="badge badge-red">${c}</span>`).join(' ') 
+                    : '<span class="badge badge-green">ALL CHECKS PASSED</span>';
+
+                html += `
+                    <tr class="drawer-row">
+                        <td colspan="12" style="padding: 0;">
+                            <div class="drawer-content">
+                                <div class="drawer-header">
+                                    <strong><i class="fa-solid fa-sliders"></i> Full Simulation Metadata & Expression Settings</strong>
+                                </div>
+                                <div class="detail-grid">
+                                    <div class="detail-cell"><span class="detail-label">Expression Code:</span><code class="detail-val-code">${escapeHtml(item.expression)}</code></div>
+                                    <div class="detail-cell"><span class="detail-label">Universe:</span><strong>${item.universe}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Neutralization:</span><strong>${item.neutralization}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Delay:</span><strong>Delay ${item.delay}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Decay:</span><strong>${item.decay}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Region:</span><strong>${item.region}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Truncation:</span><strong>${item.truncation}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Pasteurization:</span><strong>${item.pasteurization}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">NaN Handling:</span><strong>${item.nanHandling}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Unit Handling:</span><strong>${item.unitHandling}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Language:</span><strong>${item.language}</strong></div>
+                                    <div class="detail-cell"><span class="detail-label">Checks:</span>${checksBadges}</div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>`;
+            }
         });
 
         elements.resultsTableBody.innerHTML = html;
 
-        // Attach action handlers for table row buttons
+        // Attach Expand Row Handlers
+        document.querySelectorAll('.expand-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const hash = btn.getAttribute('data-hash');
+                if (expandedRowHashes.has(hash)) {
+                    expandedRowHashes.delete(hash);
+                } else {
+                    expandedRowHashes.add(hash);
+                }
+                renderResultsTable();
+            });
+        });
+
+        // Attach action handlers for PnL and Copy buttons
         document.querySelectorAll('.view-pnl-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const hash = btn.getAttribute('data-hash');
@@ -615,9 +729,8 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.pnlModal.classList.add('active');
         elements.modalAlphaTitle.innerHTML = `<i class="fa-solid fa-chart-area"></i> Alpha Performance & PnL`;
 
-        // Find item in results
         const rawItem = currentResults.find(r => r.hash === hash || r.alpha_id === hash || r.code === expressionCode);
-        const item = rawItem ? getItemProps(rawItem) : { sharpe: 1.2, fitness: 1.1, returns: 0.15, drawdown: -0.08 };
+        const item = rawItem ? getItemProps(rawItem, 0) : { sharpe: 1.25, fitness: 1.1, returns: 0.15, drawdown: -0.08 };
 
         elements.modalAlphaDetails.innerHTML = `
             <div class="stat-card"><span class="stat-label">Sharpe Ratio</span><span class="stat-val text-green">${item.sharpe !== null ? item.sharpe.toFixed(3) : '-'}</span></div>
@@ -626,7 +739,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="stat-card"><span class="stat-label">Max Drawdown</span><span class="stat-val text-orange">${item.drawdown !== null ? (Math.abs(item.drawdown) > 1 ? item.drawdown.toFixed(2) : (item.drawdown * 100).toFixed(2)) + '%' : '-'}</span></div>
         `;
 
-        // Fetch or Generate PnL curve data
         let pnlData = [];
         let labels = [];
 
@@ -645,10 +757,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('PnL fetch fallback to synthetic curve');
         }
 
-        // If no remote PnL data, construct synthetic curve based on Sharpe
         if (pnlData.length === 0) {
-            const days = 252 * 4; // 4 years of daily points
-            const sharpe = item.sharpe || 1.2;
+            const days = 252 * 4;
+            const sharpe = item.sharpe || 1.25;
             let cumulative = 1.0;
             labels = [];
             pnlData = [];
@@ -665,7 +776,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Render Chart.js
         if (pnlChartInstance) {
             pnlChartInstance.destroy();
         }
@@ -720,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------------------
-    // Utilities
+    // Notification Utility
     // -------------------------------------------------------------------------
     function showNotification(msg, type = 'info') {
         const notif = document.createElement('div');

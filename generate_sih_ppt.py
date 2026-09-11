@@ -83,7 +83,7 @@ class SIH_PDF_Generator(FPDF):
             self.set_font('Helvetica', 'B', 9)
             self.set_text_color(*NAVY)
             self.set_xy(24, y_offset)
-            self.cell(50, 5, f"• {label}", 0, 0, 'L')
+            self.cell(50, 5, f"- {label}", 0, 0, 'L')
 
             self.set_font('Helvetica', '', 8.5 if len(val) > 60 else 9)
             self.set_text_color(*DARK_BLUE)
@@ -193,19 +193,19 @@ def main():
     pdf.build_title_slide()
     
     # Slide 2: Proposed Solution
-    pdf.build_slide("Proposed Solution — From Detection to Source Attribution", "slide_assets/slide2_diagram.png", 2)
+    pdf.build_slide("Proposed Solution - From Detection to Source Attribution", "slide_assets/slide2_diagram.png", 2)
     
     # Slide 3: Technical Approach
-    pdf.build_slide("Technical Approach — System Architecture & Scope", "slide_assets/slide3_diagram.png", 3)
+    pdf.build_slide("Technical Approach - System Architecture & Scope", "slide_assets/slide3_diagram.png", 3)
     
     # Slide 4: Feasibility & Viability
-    pdf.build_slide("Feasibility & Viability — Data Strategy & Risk Mitigation", "slide_assets/slide4_diagram.png", 4)
+    pdf.build_slide("Feasibility & Viability - Data Strategy & Risk Mitigation", "slide_assets/slide4_diagram.png", 4)
     
     # Slide 5: Impact & Benefits
-    pdf.build_slide("Impact & Benefits — Evaluation Plan & Strategic Value", "slide_assets/slide5_diagram.png", 5)
+    pdf.build_slide("Impact & Benefits - Evaluation Plan & Strategic Value", "slide_assets/slide5_diagram.png", 5)
     
     # Slide 6: Research & References
-    pdf.build_slide("Research & References — Scientific & Governance Foundations", "slide_assets/slide6_diagram.png", 6)
+    pdf.build_slide("Research & References - Scientific & Governance Foundations", "slide_assets/slide6_diagram.png", 6)
     
     output_filename = "SIH_2026_MARIS_TRACER_PS26143.pdf"
     pdf.output(output_filename)

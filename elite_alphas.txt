@@ -1,0 +1,60 @@
+Code: normalize(ts_decay_linear(group_neutralize(zscore((implied_volatility_call_270 - implied_volatility_put_270)), industry), 30))
+Sharpe: 2.0600, Fitness: 2.3500, Returns: 22.33%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(zscore((implied_volatility_call_270 - implied_volatility_put_270)), industry), 15))
+Sharpe: 2.0900, Fitness: 2.0900, Returns: 22.10%, Universe: TOP3000, Decay: 0
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(zscore((implied_volatility_call_270 - implied_volatility_put_270)), industry), 30))
+Sharpe: 2.0800, Fitness: 2.2600, Returns: 22.53%, Universe: TOP3000, Decay: 0
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(zscore((implied_volatility_call_270 - implied_volatility_put_270)), industry), 60))
+Sharpe: 2.0500, Fitness: 2.6200, Returns: 23.10%, Universe: TOP3000, Decay: 8
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(zscore(ts_backfill(anl4_adjusted_netincome_ft, 60)), bucket(rank(cap), range="0, 1, 0.1")), 30))
+Sharpe: 1.6000, Fitness: 1.9400, Returns: 14.6700%, Margin(bps): 158.7600, Turnover: 2.3200%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(group_neutralize(zscore(ts_backfill(anl4_adjusted_netincome_ft, 60)), industry), bucket(rank(cap), range="0, 1, 0.1")), 30))
+Sharpe: 1.8400, Fitness: 2.0300, Returns: 16.8700%, Margin(bps): 131.7000, Turnover: 2.3100%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(zscore(ts_backfill(anl4_adjusted_netincome_ft, 60)), bucket(rank(ts_mean(volume, 20)), range="0, 1, 0.1")), 30))
+Sharpe: 1.5800, Fitness: 1.9300, Returns: 14.5100%, Margin(bps): 151.3300, Turnover: 2.4700%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize(rank(rank(ts_rank(ts_backfill(mdl177_2_earningsqualityfactor_uar, 60), 90)) - rank(ts_rank(returns, 20))), bucket(rank(cap), range="0, 1, 0.1")), 10))
+Sharpe: 2.0276, Fitness: 1.8003, Returns: 21.40%, Universe: TOP3000, Decay: 3
+--------------------------------------------------
+Code: normalize(ts_decay_linear(group_neutralize((rank(ts_delta(low, 10)) * rank(cap)), market), 5))
+Sharpe: 1.7697, Fitness: 1.4013, Returns: 18.5828%, Margin(bps): 22.3822, Turnover: 11.3231%, Universe: TOP3000, Decay: 5
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(((rank(ts_delta(rank(adv20), 10)) * rank(adv20)) * rank(adv20)), market)), 5))
+Sharpe: 1.9705, Fitness: 1.3093, Returns: -5.4366%, Margin(bps): 4.8182, Turnover: 24.4929%, Universe: TOP3000, Decay: 5
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(adv20), 2)) * rank(adv20)), market)), 3))
+Sharpe: 1.4333, Fitness: 1.2292, Returns: 1.9778%, Margin(bps): 5.1858, Turnover: 51.3901%, Universe: TOP3000, Decay: 5
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize((rank(rank(open) - rank(adv20))), market)), 3))
+Sharpe: 2.1323, Fitness: 0.7957, Returns: 9.4446%, Margin(bps): 26.4090, Turnover: 75.1975%, Universe: TOP3000, Decay: 3
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(open), 2)) * rank(rank(parkinson_volatility_10))), market)), 3))
+Sharpe: 1.3499, Fitness: 2.1299, Returns: -9.1566%, Margin(bps): 10.8118, Turnover: 53.8792%, Universe: TOP3000, Decay: 3
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(high), 10)) * rank(ts_delta(rank(volume), 5))), market)), 3))
+Sharpe: 2.0734, Fitness: 1.0649, Returns: 0.1254%, Margin(bps): 12.8832, Turnover: 19.4045%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize((rank(rank(vwap) - rank(adv20))), market)), 5))
+Sharpe: 1.3882, Fitness: 0.8816, Returns: 2.8062%, Margin(bps): 20.7868, Turnover: 6.8309%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(low), 5)) * rank(ts_delta(rank(volume), 2))), market)), 3))
+Sharpe: 1.9149, Fitness: 1.2994, Returns: 9.0663%, Margin(bps): 14.6019, Turnover: 74.9400%, Universe: TOP3000, Decay: 5
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(((rank(ts_delta(rank(high), 5)) * rank(parkinson_volatility_10)) * rank(adv20) * -1), market)), 2))
+Sharpe: 1.8857, Fitness: 1.9952, Returns: 3.6613%, Margin(bps): 2.0637, Turnover: 23.3755%, Universe: TOP3000, Decay: 5
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(((rank(ts_delta(rank(volume), 2)) * rank(ts_delta(rank(volume), 5))) * rank(adv20) * -1), market)), 2))
+Sharpe: 2.1294, Fitness: 1.0165, Returns: 4.0650%, Margin(bps): 1.7662, Turnover: 19.1547%, Universe: TOP3000, Decay: 3
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(parkinson_volatility_10) - rank(adv20))) * rank(adv20) * -1), market)), 2))
+Sharpe: 1.5035, Fitness: 1.3867, Returns: 9.7285%, Margin(bps): 1.8687, Turnover: 18.5702%, Universe: TOP3000, Decay: 2
+--------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(((rank(ts_delta(rank(vwap), 5)) * rank(parkinson_volatility_10)) * rank(adv20) * 1), market)), 3))
+Sharpe: 1.5015, Fitness: 1.3872, Returns: 25.8697%, Margin(bps): 2.6802, Turnover: 82.0650%, Universe: TOP3000, Decay: 2
+--------------------------------------------------

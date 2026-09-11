@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorldQuant BRAIN Batch Alpha Portal</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+        <div class="brand-container">
+            <div class="brand-logo">
+                <i class="fa-solid fa-bolt-lightning text-gradient"></i>
+            </div>
+            <div class="brand-text">
+                <h1>BRAIN Alpha Portal</h1>
+                <span class="subtext">Batch Simulation Engine & Analytics Dashboard</span>
+            </div>
+        </div>
+
+        <div class="nav-actions">
+            <div id="authStatusBadge" class="status-pill status-loading">
+                <span class="dot"></span>
+                <span class="status-label">Checking Auth...</span>
+            </div>
+            <button id="openCookieModalBtn" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-key"></i> Session Credentials
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="portal-container">
+        <!-- Sidebar Input & Settings Panel -->
+        <aside class="sidebar-panel">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-terminal"></i> Batch Input & Config</h2>
+                    <span class="badge badge-purple">FASTEXPR / PYTHON</span>
+                </div>
+
+                <!-- Input Mode Switcher -->
+                <div class="tab-group">
+                    <button class="tab-btn active" data-tab="editorTab">Editor</button>
+                    <button class="tab-btn" data-tab="presetsTab">Presets</button>
+                    <button class="tab-btn" data-tab="fileTab">Upload</button>
+                </div>
+
+                <!-- Editor Tab -->
+                <div id="editorTab" class="tab-content active">
+                    <div class="form-group">
+                        <label for="batchInput">Alpha Expressions (One per line or JSON Array)</label>
+                        <textarea id="batchInput" class="code-editor" placeholder="Enter alpha expressions here...
+Example:
+normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(returns), 3)) * rank(ts_delta(rank(volume), 3))) * rank(adv20) * 1), market)), 3))
+normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1) - rank(adv20))) * rank(adv20) * -1), market)), 5))"></textarea>
+                    </div>
+                </div>
+
+                <!-- Presets Tab -->
+                <div id="presetsTab" class="tab-content">
+                    <div class="form-group">
+                        <label>Select Preset Alpha Strategy Template</label>
+                        <select id="presetSelect" class="form-control">
+                            <option value="acceleration">Volume-Weighted Trend Acceleration</option>
+                            <option value="convergence">Liquidity Rank Convergence</option>
+                            <option value="volatility">Volatility Adjusted Momentum</option>
+                            <option value="reversion">Short-Term Reversion</option>
+                        </select>
+                    </div>
+                    <button id="applyPresetBtn" class="btn btn-secondary btn-block">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Insert Selected Preset
+                    </button>
+                </div>
+
+                <!-- File Upload Tab -->
+                <div id="fileTab" class="tab-content">
+                    <div class="file-dropzone" id="fileDropzone">
+                        <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                        <p>Drag & Drop <code>.csv</code> or <code>.txt</code> file here</p>
+                        <span class="sub-text">or click to browse</span>
+                        <input type="file" id="fileInput" accept=".csv,.txt" hidden>
+                    </div>
+                </div>
+
+                <!-- Simulation Settings -->
+                <div class="card-header border-top">
+                    <h3><i class="fa-solid fa-sliders"></i> Simulation Settings</h3>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Universe</label>
+                        <select id="settingUniverse" class="form-control">
+                            <option value="TOP3000" selected>TOP3000</option>
+                            <option value="TOP2000">TOP2000</option>
+                            <option value="TOP1000">TOP1000</option>
+                            <option value="TOP500">TOP500</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Neutralization</label>
+                        <select id="settingNeutralization" class="form-control">
+                            <option value="INDUSTRY" selected>INDUSTRY</option>
+                            <option value="MARKET">MARKET</option>
+                            <option value="SUBINDUSTRY">SUBINDUSTRY</option>
+                            <option value="SECTOR">SECTOR</option>
+                            <option value="NONE">NONE</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Language</label>
+                        <select id="settingLanguage" class="form-control">
+                            <option value="FASTEXPR" selected>FASTEXPR</option>
+                            <option value="PYTHON">PYTHON</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Delay</label>
+                        <select id="settingDelay" class="form-control">
+                            <option value="1" selected>1</option>
+                            <option value="0">0</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Decay</label>
+                        <select id="settingDecay" class="form-control">
+                            <option value="2" selected>2</option>
+                            <option value="0">0</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Truncation</label>
+                        <input type="number" id="settingTruncation" class="form-control" value="0.08" step="0.01">
+                    </div>
+                </div>
+
+                <div class="form-checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="settingDryRun">
+                        <span class="checkmark"></span>
+                        Dry-Run Offline Mode (Mock API)
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="settingAutoSubmit">
+                        <span class="checkmark"></span>
+                        Auto-Submit to BRAIN (Sharpe ≥ 0.5)
+                    </label>
+                </div>
+
+                <!-- Launch Actions -->
+                <div class="button-group">
+                    <button id="launchBatchBtn" class="btn btn-primary btn-glow">
+                        <i class="fa-solid fa-play"></i> Launch Batch Simulation
+                    </button>
+                    <button id="clearInputBtn" class="btn btn-secondary">
+                        <i class="fa-solid fa-eraser"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard View Area -->
+        <section class="dashboard-panel">
+            <!-- Active Jobs Queue Panel -->
+            <div class="card glass-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-list-check"></i> Active Batch Queue</h2>
+                    <span id="queueStatsBadge" class="badge badge-blue">0 Jobs Queued</span>
+                </div>
+
+                <div id="activeQueueContainer" class="queue-container">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-layer-group empty-icon"></i>
+                        <p>No active batch simulation running.</p>
+                        <span class="sub-text">Enter expressions on the left and click "Launch Batch Simulation"</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historical & Batch Results Explorer -->
+            <div class="card glass-card margin-top">
+                <div class="card-header flex-wrap">
+                    <h2><i class="fa-solid fa-chart-line"></i> Results Explorer</h2>
+                    
+                    <div class="filter-controls">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="searchInput" placeholder="Search expression or code...">
+                        </div>
+
+                        <select id="filterStatus" class="form-control filter-dropdown">
+                            <option value="ALL">All Statuses</option>
+                            <option value="SUCCESS">SUCCESS Only</option>
+                            <option value="CACHED_DUPLICATE">CACHED DUPLICATE</option>
+                            <option value="FAILED">FAILED Only</option>
+                        </select>
+
+                        <select id="filterSharpe" class="form-control filter-dropdown">
+                            <option value="ALL">All Sharpe Ratios</option>
+                            <option value="1.0">Sharpe > 1.0 (Elite)</option>
+                            <option value="0.5">Sharpe > 0.5 (Submittable)</option>
+                        </select>
+
+                        <div class="btn-group-sm">
+                            <button id="exportCsvBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                            <button id="exportEliteBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-star"></i> Elite Alphas</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div class="table-responsive">
+                    <table class="data-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th data-sort="status">Status <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="sharpe">Sharpe <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="fitness">Fitness <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="returns">Returns % <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="drawdown">Drawdown % <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="margin">Margin (bps) <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="turnover">Turnover % <i class="fa-solid fa-sort"></i></th>
+                                <th data-sort="universe">Universe</th>
+                                <th>Expression Code</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <tr>
+                                <td colspan="10" class="text-center">Loading simulation results...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: PnL Chart & Alpha Details -->
+    <div id="pnlModal" class="modal">
+        <div class="modal-content glass-card modal-lg">
+            <div class="modal-header">
+                <h3 id="modalAlphaTitle"><i class="fa-solid fa-chart-area"></i> Alpha Performance & PnL</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="chart-container">
+                    <canvas id="pnlChartCanvas"></canvas>
+                </div>
+                <div id="modalAlphaDetails" class="alpha-details-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Credentials Update -->
+    <div id="cookieModal" class="modal">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-key"></i> BRAIN Session Credentials</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="sub-text">Update your session Cookie or JWT token string below. This cookie is used to authenticate requests to <code>api.worldquantbrain.com</code>.</p>
+                <div class="form-group margin-top">
+                    <label for="cookieInput">Cookie Header String</label>
+                    <textarea id="cookieInput" class="code-editor small-editor" placeholder="Paste Cookie string here (e.g. t=eyJ0eXAi...; _ga=...)"></textarea>
+                </div>
+                <button id="saveCookieBtn" class="btn btn-primary btn-block">
+                    <i class="fa-solid fa-check"></i> Save & Validate Credentials
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

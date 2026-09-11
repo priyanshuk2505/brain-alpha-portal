@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+portal.log
+portal_error.log
+slide_assets/
+*.png

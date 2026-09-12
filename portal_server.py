@@ -103,6 +103,31 @@ def get_brain_session():
         headers["Authorization"] = f"Bearer {token}"
     return session, headers
 
+def authenticate_brain_user(email, password):
+    try:
+        session = requests.Session()
+        resp = session.post("https://api.worldquantbrain.com/authentication", auth=(email, password), timeout=10)
+        if resp.status_code in [200, 201]:
+            cookie_parts = []
+            for k, v in resp.cookies.items():
+                cookie_parts.append(f"{k}={v}")
+            
+            if cookie_parts:
+                auth_state["cookie"] = "; ".join(cookie_parts)
+            elif resp.headers.get("Set-Cookie"):
+                auth_state["cookie"] = resp.headers.get("Set-Cookie")
+                
+            auth_state["user_email"] = email
+            auth_state["authenticated"] = True
+            auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
+            return True, "Authenticated successfully with WorldQuant BRAIN"
+        else:
+            auth_state["authenticated"] = False
+            return False, f"HTTP {resp.status_code}: {resp.text}"
+    except Exception as e:
+        auth_state["authenticated"] = False
+        return False, str(e)
+
 def check_auth_status():
     session, headers = get_brain_session()
     try:
@@ -110,7 +135,7 @@ def check_auth_status():
         if resp.status_code == 200:
             data = resp.json()
             auth_state["authenticated"] = True
-            auth_state["user_email"] = data.get("email") or data.get("username") or "Authenticated User"
+            auth_state["user_email"] = data.get("email") or data.get("username") or auth_state["user_email"]
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
             return True, auth_state["user_email"]
         else:
@@ -458,6 +483,16 @@ def update_auth():
         ok, details = check_auth_status()
         return jsonify({"success": ok, "details": details, "user_email": auth_state["user_email"]})
     return jsonify({"success": False, "error": "No cookie string provided"}), 400
+
+@app.route("/api/auth/login", methods=["POST"])
+def login_auth():
+    data = request.get_json() or {}
+    email = data.get("email")
+    password = data.get("password")
+    if not email or not password:
+        return jsonify({"success": False, "message": "Email and password are required"}), 400
+    ok, details = authenticate_brain_user(email, password)
+    return jsonify({"success": ok, "message": details, "user_email": auth_state["user_email"]})
 
 @app.route("/api/simulations/batch", methods=["POST"])
 def enqueue_batch():

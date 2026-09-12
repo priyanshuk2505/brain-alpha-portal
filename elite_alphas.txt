@@ -58,3 +58,27 @@ Sharpe: 1.5035, Fitness: 1.3867, Returns: 9.7285%, Margin(bps): 1.8687, Turnover
 Code: normalize(ts_decay_linear(zscore(group_neutralize(((rank(ts_delta(rank(vwap), 5)) * rank(parkinson_volatility_10)) * rank(adv20) * 1), market)), 3))
 Sharpe: 1.5015, Fitness: 1.3872, Returns: 25.8697%, Margin(bps): 2.6802, Turnover: 82.0650%, Universe: TOP3000, Decay: 2
 --------------------------------------------------
+Code: rank(sigmoid(ts_delta(fnd45_sentiment_lm2_net_pr-fnd45_sentiment_lm2_net_qa,20)))
+Sharpe: 1.7420, Fitness: 1.4847, Returns: -1.2200%, Margin(bps): 1.7600, Turnover: 68.4400%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(sigmoid(ts_delta(fnd45_sentiment_lm2_net_pr-fnd45_sentiment_lm2_net_qa,120)))
+Sharpe: 2.1568, Fitness: 2.0499, Returns: 2.7700%, Margin(bps): 1.8400, Turnover: 11.1700%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(sigmoid(ts_delta(fnd45_sentiment_lm2_net_qa-fnd45_sentiment_lm2_net_pr,504)))
+Sharpe: 1.2767, Fitness: 1.5030, Returns: 24.7200%, Margin(bps): 2.6400, Turnover: 5.1400%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(sigmoid(ts_delta(fnd45_sentiment_vader_net_pr-fnd45_sentiment_vader_net_qa,252)))
+Sharpe: 2.3984, Fitness: 1.0671, Returns: 12.2700%, Margin(bps): 2.2800, Turnover: 34.1700%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(sigmoid(ts_delta(fnd45_sentiment_vader_net_qa-fnd45_sentiment_vader_net_pr,504)))
+Sharpe: 1.0353, Fitness: 1.5918, Returns: 3.9000%, Margin(bps): 2.3800, Turnover: 5.0100%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(sigmoid(ts_delta(fnd45_sentiment_lm2_net_pr - fnd45_sentiment_lm2_net_qa, 120))), industry)), 2))
+Sharpe: 2.3926, Fitness: 1.8253, Returns: -3.1200%, Margin(bps): 2.3800, Turnover: 18.4600%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(sigmoid(ts_delta(fnd45_sentiment_vader_net_qa - fnd45_sentiment_vader_net_pr, 20))), industry)), 3))
+Sharpe: 1.3446, Fitness: 2.1939, Returns: 20.7800%, Margin(bps): 2.7600, Turnover: 6.7400%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(sigmoid(ts_delta(fnd45_sentiment_lm2_net_qa - fnd45_sentiment_lm2_net_pr, 504))), industry)), 5))
+Sharpe: 1.8751, Fitness: 1.3182, Returns: 28.4600%, Margin(bps): 1.2200, Turnover: 68.3200%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------

@@ -718,3 +718,34 @@ h1, h2, h3, h4 {
     color: #fbbf24;
 }
 
+/* Modal Auth Tabs & Biometric UI */
+.auth-tab-content {
+    display: none;
+}
+
+.auth-tab-content.active {
+    display: block;
+    animation: drawer-fade 0.2s ease;
+}
+
+.biometric-box {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px dashed var(--primary-color);
+    border-radius: var(--radius-sm);
+    padding: 1.5rem;
+}
+
+.biometric-icon {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 0.8rem;
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+
+

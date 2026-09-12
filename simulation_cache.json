@@ -1,0 +1,529 @@
+{
+  "28ddfbcc4fb3ba2aae9e2c1f816ee6ec6509ff614fea3c4c9ed364fa49668801": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_28DDFBCC",
+    "metrics": {
+      "sharpe": 1.742,
+      "fitness": 1.4847,
+      "returns": -0.0122,
+      "drawdown": -0.1491,
+      "margin": 0.000176,
+      "turnover": 0.6844
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "28ddfbcc4fb3ba2aae9e2c1f816ee6ec6509ff614fea3c4c9ed364fa49668801"
+  },
+  "77d3b70b3f7f49e4f9071366251103f40ba8edaaaa10ef82be36dfc6fa5146a8": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_77D3B70B",
+    "metrics": {
+      "sharpe": 0.2599,
+      "fitness": 1.078,
+      "returns": 0.3358,
+      "drawdown": -0.1437,
+      "margin": 0.000247,
+      "turnover": 0.643
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "77d3b70b3f7f49e4f9071366251103f40ba8edaaaa10ef82be36dfc6fa5146a8"
+  },
+  "68eaa743103c4012297b25b9e660395ab68741a4de6ee8ddd9705b8d28170f2f": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_68EAA743",
+    "metrics": {
+      "sharpe": 2.1568,
+      "fitness": 2.0499,
+      "returns": 0.0277,
+      "drawdown": -0.2399,
+      "margin": 0.000184,
+      "turnover": 0.1117
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "68eaa743103c4012297b25b9e660395ab68741a4de6ee8ddd9705b8d28170f2f"
+  },
+  "80f4a587876ba61c490d480f5b728601399db5cdf06322416e8e7bee36159cab": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_80F4A587",
+    "metrics": {
+      "sharpe": 1.2207,
+      "fitness": 1.8186,
+      "returns": -0.0009,
+      "drawdown": -0.1646,
+      "margin": 6.5e-05,
+      "turnover": 0.6957
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "80f4a587876ba61c490d480f5b728601399db5cdf06322416e8e7bee36159cab"
+  },
+  "42c8601e0721e4d74368079ed551c2db3e67a1ddfe03bd068f77ac620a443f10": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_42C8601E",
+    "metrics": {
+      "sharpe": 0.9876,
+      "fitness": 1.9228,
+      "returns": 0.1487,
+      "drawdown": -0.1361,
+      "margin": 0.000107,
+      "turnover": 0.1819
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "42c8601e0721e4d74368079ed551c2db3e67a1ddfe03bd068f77ac620a443f10"
+  },
+  "77f61313e2c1055efd5440b69e8c7026a0b48ee9119c19947eef5c3d500fb640": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_77F61313",
+    "metrics": {
+      "sharpe": 1.5625,
+      "fitness": 0.5706,
+      "returns": 0.0222,
+      "drawdown": -0.1212,
+      "margin": 5.7e-05,
+      "turnover": 0.3099
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "77f61313e2c1055efd5440b69e8c7026a0b48ee9119c19947eef5c3d500fb640"
+  },
+  "7bd3991d0a57ded5c599b7226e03e19ff191d260cd5a4ce5eeb3b4dafee0163d": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_7BD3991D",
+    "metrics": {
+      "sharpe": 1.5379,
+      "fitness": 0.4702,
+      "returns": -0.0148,
+      "drawdown": -0.1605,
+      "margin": 0.000249,
+      "turnover": 0.2467
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "7bd3991d0a57ded5c599b7226e03e19ff191d260cd5a4ce5eeb3b4dafee0163d"
+  },
+  "1ec8f1ba02f9665a0e96f08979c3c322091ee858f29e85ce29c1027cb1701e00": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_1EC8F1BA",
+    "metrics": {
+      "sharpe": 1.2767,
+      "fitness": 1.503,
+      "returns": 0.2472,
+      "drawdown": -0.0835,
+      "margin": 0.000264,
+      "turnover": 0.0514
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "1ec8f1ba02f9665a0e96f08979c3c322091ee858f29e85ce29c1027cb1701e00"
+  },
+  "73f99082b85479b69f519f67cf9a2dca9402bbe2541324b7e415bb299e06c946": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_73F99082",
+    "metrics": {
+      "sharpe": 1.4208,
+      "fitness": 0.7421,
+      "returns": 0.0473,
+      "drawdown": -0.0447,
+      "margin": 0.000147,
+      "turnover": 0.8111
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "73f99082b85479b69f519f67cf9a2dca9402bbe2541324b7e415bb299e06c946"
+  },
+  "7395aad720dc1a9b9af3b328d31fac13c118b284d83ba22cadf2c340206ecc87": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_7395AAD7",
+    "metrics": {
+      "sharpe": 2.3984,
+      "fitness": 1.0671,
+      "returns": 0.1227,
+      "drawdown": -0.1512,
+      "margin": 0.000228,
+      "turnover": 0.3417
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "7395aad720dc1a9b9af3b328d31fac13c118b284d83ba22cadf2c340206ecc87"
+  },
+  "85cac0587e13c9896edc038025d47ea311ab2753cd83b4d059afba93b99e1a58": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_85CAC058",
+    "metrics": {
+      "sharpe": 1.4995,
+      "fitness": 0.6765,
+      "returns": -0.0321,
+      "drawdown": -0.1638,
+      "margin": 0.000239,
+      "turnover": 0.3615
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "85cac0587e13c9896edc038025d47ea311ab2753cd83b4d059afba93b99e1a58"
+  },
+  "921b96cd28cb900e66ebdc9dd66f64fda2b7c6fc436aeda75329725472b4732c": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_921B96CD",
+    "metrics": {
+      "sharpe": 1.8533,
+      "fitness": 1.5731,
+      "returns": 0.0238,
+      "drawdown": -0.1314,
+      "margin": 7.6e-05,
+      "turnover": 0.7295
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "921b96cd28cb900e66ebdc9dd66f64fda2b7c6fc436aeda75329725472b4732c"
+  },
+  "c1ca347066045d47414ca958ba191a65e9d2bb3f3d882dc29932351d7e99d024": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_C1CA3470",
+    "metrics": {
+      "sharpe": 1.4958,
+      "fitness": 0.4471,
+      "returns": -0.0018,
+      "drawdown": -0.0235,
+      "margin": 0.000149,
+      "turnover": 0.7078
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "c1ca347066045d47414ca958ba191a65e9d2bb3f3d882dc29932351d7e99d024"
+  },
+  "0d7b76b65774c00805dc35d83caa06523dffdcc1f5c416c21e89e4832c6edefa": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_0D7B76B6",
+    "metrics": {
+      "sharpe": 0.9937,
+      "fitness": 0.723,
+      "returns": 0.3179,
+      "drawdown": -0.2175,
+      "margin": 9.6e-05,
+      "turnover": 0.7825
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "0d7b76b65774c00805dc35d83caa06523dffdcc1f5c416c21e89e4832c6edefa"
+  },
+  "4e08b2405e2277e3446875aede43ed4b8e1793a00a5324e2d9fa0fa44860b5d9": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_4E08B240",
+    "metrics": {
+      "sharpe": 0.5304,
+      "fitness": 2.1023,
+      "returns": 0.3395,
+      "drawdown": -0.0276,
+      "margin": 0.000317,
+      "turnover": 0.5098
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "4e08b2405e2277e3446875aede43ed4b8e1793a00a5324e2d9fa0fa44860b5d9"
+  },
+  "4a9dd9701d59336b533fbe9e96dc91f18beae0ebe51a9f46c2532e2a588d941a": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_4A9DD970",
+    "metrics": {
+      "sharpe": 1.0353,
+      "fitness": 1.5918,
+      "returns": 0.039,
+      "drawdown": -0.2492,
+      "margin": 0.000238,
+      "turnover": 0.0501
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "4a9dd9701d59336b533fbe9e96dc91f18beae0ebe51a9f46c2532e2a588d941a"
+  },
+  "6195f1647019b536c244983db7f3f0b65db5b7f8a3adabbf06507c20531b0465": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_6195F164",
+    "metrics": {
+      "sharpe": 0.4733,
+      "fitness": 0.7507,
+      "returns": 0.2503,
+      "drawdown": -0.1661,
+      "margin": 0.000133,
+      "turnover": 0.2948
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "6195f1647019b536c244983db7f3f0b65db5b7f8a3adabbf06507c20531b0465"
+  },
+  "74d2369e617cf19dbf86076a8824d7a29c86f46e4311cbdf9a1283ae56fce0b4": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_74D2369E",
+    "metrics": {
+      "sharpe": 2.2344,
+      "fitness": 0.684,
+      "returns": 0.2697,
+      "drawdown": -0.0187,
+      "margin": 0.000167,
+      "turnover": 0.6082
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 2,
+    "cached": false,
+    "hash": "74d2369e617cf19dbf86076a8824d7a29c86f46e4311cbdf9a1283ae56fce0b4"
+  },
+  "4ae05921bd4ada968e6b18cc3a221a3d147078c092c0ebad6b0103260076c09d": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_4AE05921",
+    "metrics": {
+      "sharpe": 0.9642,
+      "fitness": 1.3206,
+      "returns": 0.3043,
+      "drawdown": -0.1996,
+      "margin": 0.000334,
+      "turnover": 0.4932
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "4ae05921bd4ada968e6b18cc3a221a3d147078c092c0ebad6b0103260076c09d"
+  },
+  "5a5ab995860aba0b899cfc9c0094750ee4950c8f09f8bddddab919cf3bc5726c": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_5A5AB995",
+    "metrics": {
+      "sharpe": 1.2927,
+      "fitness": 0.8376,
+      "returns": 0.1822,
+      "drawdown": -0.242,
+      "margin": 0.000208,
+      "turnover": 0.5833
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "5a5ab995860aba0b899cfc9c0094750ee4950c8f09f8bddddab919cf3bc5726c"
+  },
+  "b469c119df91bbc3277425a79c9ea4e80a27fafe19fd915253053ac485e4001a": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_B469C119",
+    "metrics": {
+      "sharpe": 0.9295,
+      "fitness": 0.6857,
+      "returns": 0.1203,
+      "drawdown": -0.1057,
+      "margin": 5e-05,
+      "turnover": 0.6242
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "b469c119df91bbc3277425a79c9ea4e80a27fafe19fd915253053ac485e4001a"
+  },
+  "7088a7c47619df77d47e1bc41b94262b7c00410b57abbfe089e56cbe6cfebff1": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_7088A7C4",
+    "metrics": {
+      "sharpe": 1.2255,
+      "fitness": 0.7322,
+      "returns": 0.2735,
+      "drawdown": -0.2386,
+      "margin": 7e-05,
+      "turnover": 0.5353
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "7088a7c47619df77d47e1bc41b94262b7c00410b57abbfe089e56cbe6cfebff1"
+  },
+  "3fcc4eeedfc0450a513d4b7e8a4daf7c281d35dead1b9f1f4df91c1efa779b13": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_3FCC4EEE",
+    "metrics": {
+      "sharpe": 0.2768,
+      "fitness": 1.3147,
+      "returns": 0.1805,
+      "drawdown": -0.2322,
+      "margin": 0.000341,
+      "turnover": 0.766
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "3fcc4eeedfc0450a513d4b7e8a4daf7c281d35dead1b9f1f4df91c1efa779b13"
+  },
+  "f8cc7e677e0bb72d1d7af9955b0fca50e341595ee6d9406c84cbfe408d21dd22": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_F8CC7E67",
+    "metrics": {
+      "sharpe": 1.5744,
+      "fitness": 0.4382,
+      "returns": 0.1096,
+      "drawdown": -0.1741,
+      "margin": 0.00032,
+      "turnover": 0.6788
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "f8cc7e677e0bb72d1d7af9955b0fca50e341595ee6d9406c84cbfe408d21dd22"
+  },
+  "4f6d94139fa4121fc9e0e1ca9ea6787a84b7e61983ceda499656346cb36f76c2": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_4F6D9413",
+    "metrics": {
+      "sharpe": 2.3926,
+      "fitness": 1.8253,
+      "returns": -0.0312,
+      "drawdown": -0.2343,
+      "margin": 0.000238,
+      "turnover": 0.1846
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "4f6d94139fa4121fc9e0e1ca9ea6787a84b7e61983ceda499656346cb36f76c2"
+  },
+  "5c615a5834517ff89a9958ff62db25b7d8c3b91b0ea6761b630289ea1dad57e9": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_5C615A58",
+    "metrics": {
+      "sharpe": 2.0934,
+      "fitness": 0.4973,
+      "returns": 0.1397,
+      "drawdown": -0.09,
+      "margin": 0.000194,
+      "turnover": 0.6512
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "5c615a5834517ff89a9958ff62db25b7d8c3b91b0ea6761b630289ea1dad57e9"
+  },
+  "b94f9cc93ccb8205d29937e3bee2bc0e71018c4f766871428d3bd06113dd2381": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_B94F9CC9",
+    "metrics": {
+      "sharpe": 1.5502,
+      "fitness": 0.4643,
+      "returns": 0.2079,
+      "drawdown": -0.2334,
+      "margin": 0.000317,
+      "turnover": 0.7223
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "b94f9cc93ccb8205d29937e3bee2bc0e71018c4f766871428d3bd06113dd2381"
+  },
+  "18f9b15ec6c354af8c2ed2f13e806d293bae47d55ab0159a9bec5927bd6a5ac4": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_18F9B15E",
+    "metrics": {
+      "sharpe": 1.3446,
+      "fitness": 2.1939,
+      "returns": 0.2078,
+      "drawdown": -0.2338,
+      "margin": 0.000276,
+      "turnover": 0.0674
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "18f9b15ec6c354af8c2ed2f13e806d293bae47d55ab0159a9bec5927bd6a5ac4"
+  },
+  "8c4dbee08db95a39308ce99ce409628fddb27492fcf0f45f8a83b70a255f6482": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_8C4DBEE0",
+    "metrics": {
+      "sharpe": 2.1463,
+      "fitness": 0.4495,
+      "returns": 0.2671,
+      "drawdown": -0.2261,
+      "margin": 0.000269,
+      "turnover": 0.1612
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "8c4dbee08db95a39308ce99ce409628fddb27492fcf0f45f8a83b70a255f6482"
+  },
+  "4f1c21d46409bb23a03fa81d08f7cbf5b00733e7e7c642a67387804196018e07": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_4F1C21D4",
+    "metrics": {
+      "sharpe": 0.2324,
+      "fitness": 1.7831,
+      "returns": 0.0327,
+      "drawdown": -0.225,
+      "margin": 0.000322,
+      "turnover": 0.7422
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "4f1c21d46409bb23a03fa81d08f7cbf5b00733e7e7c642a67387804196018e07"
+  },
+  "d70ed01b5b8f318ecab11b30820744801cb60aa105c45c1f4429e954e3c089d6": {
+    "status": "SUCCESS",
+    "alpha_id": "MOCK_D70ED01B",
+    "metrics": {
+      "sharpe": 1.8751,
+      "fitness": 1.3182,
+      "returns": 0.2846,
+      "drawdown": -0.0376,
+      "margin": 0.000122,
+      "turnover": 0.6832
+    },
+    "failed_checks": [],
+    "universe": "TOP3000",
+    "decay": 5,
+    "cached": false,
+    "hash": "d70ed01b5b8f318ecab11b30820744801cb60aa105c45c1f4429e954e3c089d6"
+  }
+}

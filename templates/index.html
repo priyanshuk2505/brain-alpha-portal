@@ -348,22 +348,60 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
         </div>
     </div>
 
-    <!-- Modal: Credentials Update -->
+    <!-- Modal: Credentials & Authentication -->
     <div id="cookieModal" class="modal">
         <div class="modal-content glass-card">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-key"></i> BRAIN Session Credentials</h3>
+                <h3><i class="fa-solid fa-key"></i> WorldQuant BRAIN Authentication</h3>
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <p class="sub-text">Update your session Cookie or JWT token string below. This cookie is used to authenticate requests to <code>api.worldquantbrain.com</code>.</p>
-                <div class="form-group margin-top">
-                    <label for="cookieInput">Cookie Header String</label>
-                    <textarea id="cookieInput" class="code-editor small-editor" placeholder="Paste Cookie string here (e.g. t=eyJ0eXAi...; _ga=...)"></textarea>
+                <p class="sub-text">Authenticate your session to connect directly with <code>api.worldquantbrain.com</code>.</p>
+                
+                <!-- Auth Method Tabs -->
+                <div class="tab-group margin-top">
+                    <button class="tab-btn active" id="authEmailTabBtn" data-authtab="authEmailTab"><i class="fa-solid fa-envelope"></i> Email & Password</button>
+                    <button class="tab-btn" id="authBioTabBtn" data-authtab="authBioTab"><i class="fa-solid fa-fingerprint"></i> Biometric / Touch ID</button>
+                    <button class="tab-btn" id="authCookieTabBtn" data-authtab="authCookieTab"><i class="fa-solid fa-cookie"></i> Session Cookie</button>
                 </div>
-                <button id="saveCookieBtn" class="btn btn-primary btn-block">
-                    <i class="fa-solid fa-check"></i> Save & Validate Credentials
-                </button>
+
+                <!-- Tab 1: Email & Password -->
+                <div id="authEmailTab" class="auth-tab-content active">
+                    <div class="form-group margin-top">
+                        <label for="loginEmailInput">WorldQuant BRAIN Email</label>
+                        <input type="email" id="loginEmailInput" class="form-control" placeholder="user@example.com" value="priyanshubhadani25@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPasswordInput">BRAIN Password</label>
+                        <input type="password" id="loginPasswordInput" class="form-control" placeholder="Enter your BRAIN account password">
+                    </div>
+                    <button id="loginBrainBtn" class="btn btn-primary btn-block margin-top">
+                        <i class="fa-solid fa-right-to-bracket"></i> Log In & Authorize Session
+                    </button>
+                </div>
+
+                <!-- Tab 2: Biometric / Touch ID -->
+                <div id="authBioTab" class="auth-tab-content">
+                    <div class="biometric-box text-center margin-top">
+                        <i class="fa-solid fa-fingerprint biometric-icon"></i>
+                        <h4>Passkey / Biometric Authentication</h4>
+                        <p class="sub-text">Use your Mac Touch ID, Face ID, or Hardware Security Key for instant passwordless authentication.</p>
+                        <button id="biometricAuthBtn" class="btn btn-primary btn-block margin-top">
+                            <i class="fa-solid fa-fingerprint"></i> Authenticate with Touch ID / Passkey
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Manual Cookie -->
+                <div id="authCookieTab" class="auth-tab-content">
+                    <div class="form-group margin-top">
+                        <label for="cookieInput">Cookie Header String or JWT Token</label>
+                        <textarea id="cookieInput" class="code-editor small-editor" placeholder="Paste Cookie string or JWT token here (e.g. t=eyJ0eXAi...; _ga=...)"></textarea>
+                    </div>
+                    <button id="saveCookieBtn" class="btn btn-secondary btn-block">
+                        <i class="fa-solid fa-check"></i> Save & Validate Cookie
+                    </button>
+                </div>
             </div>
         </div>
     </div>

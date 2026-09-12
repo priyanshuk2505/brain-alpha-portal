@@ -452,28 +452,65 @@ def log_result_to_csv(result, expression, settings):
 
 
 # -----------------------------------------------------------------------------
-# Background Queue Worker Thread
+# Background Queue Worker — 7 Parallel Slots (BRAIN Concurrency Limit)
 # -----------------------------------------------------------------------------
-def background_worker():
+MAX_CONCURRENT_SIMS = 7
+
+# Shared cancel event — set to stop all in-flight simulations & drain queue
+cancel_event = threading.Event()
+
+# Per-slot live status tracking (slot_id -> dict)
+slot_status = {i: {"slot": i + 1, "status": "IDLE", "expression": None, "batch_id": None, "item_index": None, "start_time": None} for i in range(MAX_CONCURRENT_SIMS)}
+slot_lock = threading.Lock()
+
+def worker_slot(slot_id):
+    """Each slot runs as a permanent daemon thread, pulling from job_queue."""
     while True:
         job_item = job_queue.get()
         if job_item is None:
+            job_queue.task_done()
             break
-            
+
         batch_id, item_index, item = job_item
+
+        # Skip immediately if cancelled
+        if cancel_event.is_set():
+            with jobs_lock:
+                if batch_id in batch_jobs:
+                    batch_jobs[batch_id]["items"][item_index]["status"] = "CANCELLED"
+                    batch_jobs[batch_id]["completed"] += 1
+                    completed = batch_jobs[batch_id]["completed"]
+                    total = batch_jobs[batch_id]["total"]
+                    batch_jobs[batch_id]["progress"] = round((completed / total) * 100, 1)
+                    if completed == total:
+                        batch_jobs[batch_id]["status"] = "CANCELLED"
+            job_queue.task_done()
+            continue
+
         expression = item["expression"]
         settings = item["settings"]
         dry_run = item["dry_run"]
         auto_submit = item.get("auto_submit", False)
-        
+
+        # Mark slot as busy
+        with slot_lock:
+            slot_status[slot_id].update({
+                "status": "SIMULATING",
+                "expression": expression[:80] + ("..." if len(expression) > 80 else ""),
+                "batch_id": batch_id,
+                "item_index": item_index,
+                "start_time": datetime.now(timezone.utc).isoformat()
+            })
+
         with jobs_lock:
             if batch_id in batch_jobs:
                 batch_jobs[batch_id]["items"][item_index]["status"] = "SIMULATING"
+                batch_jobs[batch_id]["items"][item_index]["slot"] = slot_id + 1
                 batch_jobs[batch_id]["items"][item_index]["start_time"] = datetime.now(timezone.utc).isoformat()
-                
+
         res = run_single_simulation(expression, settings, dry_run=dry_run)
-        
-        # Auto-submit check if Sharpe >= 0.5
+
+        # Auto-submit check
         metrics = res.get("metrics") or {}
         sharpe = float(metrics.get("sharpe", 0.0))
         if auto_submit and res.get("status") in ["SUCCESS", "CACHED_DUPLICATE"] and sharpe >= 0.5:
@@ -482,26 +519,42 @@ def background_worker():
                 sub_ok, sub_msg = submit_alpha_to_brain(alpha_id, dry_run=dry_run)
                 res["submitted"] = sub_ok
                 res["submit_msg"] = sub_msg
-                
-        # Log to CSV
+
         log_result_to_csv(res, expression, settings)
-        
+
         with jobs_lock:
             if batch_id in batch_jobs:
                 batch_jobs[batch_id]["items"][item_index]["status"] = res.get("status")
                 batch_jobs[batch_id]["items"][item_index]["result"] = res
+                batch_jobs[batch_id]["items"][item_index]["slot"] = slot_id + 1
                 batch_jobs[batch_id]["completed"] += 1
-                total = batch_jobs[batch_id]["total"]
                 completed = batch_jobs[batch_id]["completed"]
+                total = batch_jobs[batch_id]["total"]
                 batch_jobs[batch_id]["progress"] = round((completed / total) * 100, 1)
                 if completed == total:
                     batch_jobs[batch_id]["status"] = "COMPLETED"
                     batch_jobs[batch_id]["end_time"] = datetime.now(timezone.utc).isoformat()
-                    
+
+        # Mark slot as idle
+        with slot_lock:
+            slot_status[slot_id].update({
+                "status": "IDLE",
+                "expression": None,
+                "batch_id": None,
+                "item_index": None,
+                "start_time": None
+            })
+
         job_queue.task_done()
 
-worker_thread = threading.Thread(target=background_worker, daemon=True)
-worker_thread.start()
+# Launch all 7 worker threads
+worker_threads = []
+for _slot_id in range(MAX_CONCURRENT_SIMS):
+    t = threading.Thread(target=worker_slot, args=(_slot_id,), daemon=True)
+    t.start()
+    worker_threads.append(t)
+
+
 
 # -----------------------------------------------------------------------------
 # REST API Endpoints
@@ -605,30 +658,56 @@ def enqueue_batch():
 
 @app.route("/api/simulations/cancel", methods=["POST"])
 def cancel_batch():
+    global cancel_event
+
+    # 1. Signal all workers to skip pending jobs
+    cancel_event.set()
+
+    # 2. Drain the queue so workers don't pick up new items
+    cancelled_count = 0
+    while not job_queue.empty():
+        try:
+            job_queue.get_nowait()
+            job_queue.task_done()
+            cancelled_count += 1
+        except Exception:
+            break
+
+    # 3. Mark all running batches as CANCELLED
     with jobs_lock:
-        # Clear queued items
-        cancelled_count = 0
-        while not job_queue.empty():
-            try:
-                job_queue.get_nowait()
-                job_queue.task_done()
-                cancelled_count += 1
-            except Exception:
-                break
-                
-        # Mark all running/pending batches as CANCELLED
         for b_id, b_data in batch_jobs.items():
             if b_data.get("status") in ["RUNNING", "PENDING"]:
                 b_data["status"] = "CANCELLED"
                 b_data["end_time"] = datetime.now(timezone.utc).isoformat()
-                
-    return jsonify({"success": True, "message": "Stopped active simulations and cancelled queue", "cancelled_items": cancelled_count})
+                for item in b_data.get("items", []):
+                    if item.get("status") in ["QUEUED", "SIMULATING"]:
+                        item["status"] = "CANCELLED"
+
+    # 4. Reset all slots to IDLE
+    with slot_lock:
+        for sid in slot_status:
+            slot_status[sid].update({
+                "status": "IDLE", "expression": None,
+                "batch_id": None, "item_index": None, "start_time": None
+            })
+
+    # 5. Clear cancel flag so new batches can run
+    cancel_event.clear()
+
+    return jsonify({"success": True, "message": f"Cancelled queue and stopped all {cancelled_count} pending jobs. All 7 slots now idle."})
+
+@app.route("/api/simulations/slots", methods=["GET"])
+def get_slots():
+    with slot_lock:
+        return jsonify(list(slot_status.values()))
 
 @app.route("/api/simulations/batches", methods=["GET"])
 def get_batches():
     with jobs_lock:
         summary_list = []
         for b_id, b_data in batch_jobs.items():
+            # Count how many are actively running in slots
+            simulating_count = sum(1 for item in b_data.get("items", []) if item.get("status") == "SIMULATING")
             summary_list.append({
                 "batch_id": b_id,
                 "created_at": b_data["created_at"],
@@ -637,9 +716,12 @@ def get_batches():
                 "progress": b_data["progress"],
                 "status": b_data["status"],
                 "dry_run": b_data["dry_run"],
-                "settings": b_data["settings"]
+                "settings": b_data["settings"],
+                "simulating_now": simulating_count,
+                "queued_remaining": b_data["total"] - b_data["completed"] - simulating_count
             })
         return jsonify(summary_list)
+
 
 @app.route("/api/simulations/batch/<batch_id>", methods=["GET"])
 def get_batch_details(batch_id):

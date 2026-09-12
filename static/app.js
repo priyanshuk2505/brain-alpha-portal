@@ -632,20 +632,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------------------
-    // Fetch Queue & Results Data
+    // Fetch Queue, Slots & Results Data
     // -------------------------------------------------------------------------
+    let currentSlots = [];
+
     async function fetchQueueAndResults() {
         try {
-            const [batchesResp, resultsResp] = await Promise.all([
+            const [batchesResp, resultsResp, slotsResp] = await Promise.all([
                 fetch('/api/simulations/batches'),
-                fetch('/api/results')
+                fetch('/api/results'),
+                fetch('/api/simulations/slots')
             ]);
 
             if (batchesResp.ok) {
                 const batchData = await batchesResp.json();
                 currentBatches = Array.isArray(batchData) ? batchData : Object.values(batchData.batches || batchData || {});
-                renderActiveQueue();
             }
+
+            if (slotsResp.ok) {
+                currentSlots = await slotsResp.json();
+            }
+
+            renderActiveQueue();
 
             if (resultsResp.ok) {
                 const resultsData = await resultsResp.json();
@@ -698,14 +706,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------------------
-    // Render Active Queue Panel with Detailed Progress Bar
+    // Render Active Queue Panel — 7 Live Slots + Batch Progress
     // -------------------------------------------------------------------------
     function renderActiveQueue() {
         const activeJobs = currentBatches.filter(b => b.status === 'RUNNING' || b.status === 'PENDING');
-        elements.queueStatsBadge.textContent = `${activeJobs.length} Jobs Active`;
-        elements.queueStatsBadge.className = activeJobs.length > 0 ? 'badge badge-blue' : 'badge badge-purple';
+        const totalQueued = activeJobs.reduce((s, b) => s + (b.queued_remaining || 0), 0);
+        const totalSimulating = (currentSlots || []).filter(s => s.status === 'SIMULATING').length;
 
-        if (currentBatches.length === 0) {
+        elements.queueStatsBadge.textContent = activeJobs.length > 0
+            ? `${totalSimulating} Running • ${totalQueued} Queued`
+            : `${currentBatches.length} Batches Total`;
+        elements.queueStatsBadge.className = activeJobs.length > 0 ? 'badge badge-orange' : 'badge badge-purple';
+
+        if (currentBatches.length === 0 && (!currentSlots || currentSlots.every(s => s.status === 'IDLE'))) {
             elements.activeQueueContainer.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-layer-group empty-icon"></i>
@@ -716,39 +729,104 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let html = '';
-        currentBatches.slice(0, 5).forEach(batch => {
-            const completedCount = (batch.completed || 0) + (batch.failed || 0);
+
+        // ── 7 Slot Live Monitor ──────────────────────────────────────────────
+        if (currentSlots && currentSlots.length > 0) {
+            const busySlots = currentSlots.filter(s => s.status === 'SIMULATING').length;
+            html += `
+            <div class="slots-monitor glass-card" style="margin-bottom:14px; padding:12px; border:1px solid rgba(0,242,254,0.2); border-radius:10px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <span style="font-weight:700; font-size:0.85rem; color:#38bdf8;">
+                        <i class="fa-solid fa-microchip"></i>&nbsp; Concurrent Simulation Slots
+                    </span>
+                    <span style="font-size:0.75rem; color:#64748b;">${busySlots}/7 Active</span>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:6px;">`;
+
+            for (const slot of currentSlots) {
+                const isActive = slot.status === 'SIMULATING';
+                const expr = slot.expression || '';
+                const shortExpr = expr.length > 22 ? expr.substring(0, 22) + '…' : expr;
+                const elapsed = slot.start_time ? Math.floor((Date.now() - new Date(slot.start_time).getTime()) / 1000) : 0;
+                const elapsedStr = elapsed > 0 ? `${elapsed}s` : '';
+
+                html += `
+                <div title="${isActive ? expr : 'Idle'}" style="
+                    background: ${isActive ? 'linear-gradient(135deg, rgba(0,242,254,0.15), rgba(79,172,254,0.08))' : 'rgba(255,255,255,0.03)'};
+                    border: 1px solid ${isActive ? 'rgba(0,242,254,0.5)' : 'rgba(255,255,255,0.07)'};
+                    border-radius: 8px;
+                    padding: 8px 6px;
+                    text-align: center;
+                    transition: all 0.3s;
+                    min-height: 72px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 3px;
+                ">
+                    <div style="font-size:0.65rem; font-weight:700; color:${isActive ? '#00f2fe' : '#334155'}; letter-spacing:0.05em;">
+                        SLOT ${slot.slot}
+                    </div>
+                    ${isActive ? `
+                        <i class="fa-solid fa-circle-notch fa-spin" style="color:#00f2fe; font-size:0.9rem;"></i>
+                        <div style="font-size:0.6rem; color:#94a3b8; word-break:break-all; line-height:1.2;">${shortExpr}</div>
+                        ${elapsedStr ? `<div style="font-size:0.6rem; color:#4facfe;">${elapsedStr}</div>` : ''}
+                    ` : `
+                        <i class="fa-solid fa-circle" style="color:#1e293b; font-size:0.7rem;"></i>
+                        <div style="font-size:0.6rem; color:#334155;">idle</div>
+                    `}
+                </div>`;
+            }
+
+            html += `</div></div>`;
+        }
+
+        // ── Batch Progress Cards ─────────────────────────────────────────────
+        currentBatches.slice(0, 8).forEach(batch => {
+            const completedCount = batch.completed || 0;
             const totalCount = batch.total || 1;
             const pct = Math.round((completedCount / totalCount) * 100);
             const isFinished = batch.status === 'COMPLETED';
+            const isCancelled = batch.status === 'CANCELLED';
+            const simNow = batch.simulating_now || 0;
+            const queuedLeft = batch.queued_remaining || 0;
 
-            const createdTimeStr = typeof batch.created_at === 'number' 
-                ? new Date(batch.created_at * 1000).toLocaleTimeString() 
+            const createdTimeStr = typeof batch.created_at === 'number'
+                ? new Date(batch.created_at * 1000).toLocaleTimeString()
                 : new Date(batch.created_at).toLocaleTimeString();
 
+            let statusColor = isFinished ? 'badge-green' : isCancelled ? 'badge-red' : 'badge-orange';
+            let progressColor = isFinished ? '#22c55e' : isCancelled ? '#ef4444' : '#00f2fe';
+
             html += `
-                <div class="job-card ${isFinished ? 'job-card-completed' : 'job-card-active'}">
+                <div class="job-card ${isFinished ? 'job-card-completed' : isCancelled ? 'job-card-cancelled' : 'job-card-active'}">
                     <div class="job-card-header">
                         <div class="job-title">
-                            <span class="batch-id"><i class="fa-solid fa-layer-group"></i> Batch #${batch.batch_id}</span>
-                            <span class="badge ${isFinished ? 'badge-green' : 'badge-orange'}">${batch.status}</span>
+                            <span class="batch-id"><i class="fa-solid fa-layer-group"></i> ${batch.batch_id}</span>
+                            <span class="badge ${statusColor}">${batch.status}</span>
                         </div>
                         <span class="job-time">${createdTimeStr}</span>
                     </div>
 
                     <div class="job-progress-info">
-                        <span>Simulated Progress: <strong>${completedCount} / ${totalCount} Alphas</strong></span>
-                        <span class="font-bold text-gradient">${pct}% Complete</span>
+                        <span>Completed: <strong>${completedCount} / ${totalCount}</strong></span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            ${simNow > 0 ? `<span style="color:#00f2fe; font-size:0.75rem;"><i class="fa-solid fa-circle-notch fa-spin"></i> ${simNow} running</span>` : ''}
+                            ${queuedLeft > 0 ? `<span style="color:#94a3b8; font-size:0.75rem;">${queuedLeft} queued</span>` : ''}
+                            <span class="font-bold" style="color:${progressColor};">${pct}%</span>
+                        </div>
                     </div>
 
                     <div class="progress-bar-container margin-top-xs">
-                        <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                        <div class="progress-bar-fill" style="width: ${pct}%; background: ${isCancelled ? '#ef4444' : 'linear-gradient(90deg, #00f2fe, #4facfe)'};"></div>
                     </div>
 
                     <div class="job-meta flex-wrap margin-top-xs">
+                        <span>Region: <strong>${batch.settings?.region || 'USA'}</strong></span>
                         <span>Universe: <strong>${batch.settings?.universe || 'TOP3000'}</strong></span>
                         <span>Delay: <strong>${batch.settings?.delay ?? 1}</strong></span>
-                        <span>Neutralization: <strong>${batch.settings?.neutralization || 'INDUSTRY'}</strong></span>
+                        <span>Neut: <strong>${batch.settings?.neutralization || 'INDUSTRY'}</strong></span>
                         ${batch.dry_run || batch.settings?.dry_run ? '<span class="badge badge-purple">Dry-Run</span>' : ''}
                     </div>
                 </div>`;
@@ -756,6 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         elements.activeQueueContainer.innerHTML = html;
     }
+
 
     // -------------------------------------------------------------------------
     // Render Multi-Filtered Results Table with Details Drawers

@@ -76,7 +76,15 @@ def get_alpha_hash(expression, settings):
 # -----------------------------------------------------------------------------
 def get_brain_session():
     session = requests.Session()
-    cookie_str = auth_state["cookie"]
+    cookie_str = auth_state["cookie"].strip()
+    
+    # Auto-format raw JWT token if pasted without 't=' prefix
+    if (cookie_str.startswith("eyJ") or cookie_str.startswith("teyJ")) and ";" not in cookie_str:
+        if cookie_str.startswith("teyJ"):
+            cookie_str = cookie_str[1:] # strip accidental leading t
+        cookie_str = f"t={cookie_str}"
+        auth_state["cookie"] = cookie_str
+
     headers = {
         "Cookie": cookie_str,
         "Content-Type": "application/json"
@@ -87,6 +95,10 @@ def get_brain_session():
         if part.startswith("t="):
             token = part[2:]
             break
+            
+    if not token and (cookie_str.startswith("eyJ") or cookie_str.startswith("t=")):
+        token = cookie_str[2:] if cookie_str.startswith("t=") else cookie_str
+
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return session, headers

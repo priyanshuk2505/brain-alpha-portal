@@ -99,84 +99,146 @@ def get_alpha_hash(expression, settings):
 # -----------------------------------------------------------------------------
 # BRAIN Session & Auth Helpers
 # -----------------------------------------------------------------------------
+# Persistent session — holds JWT cookie across all simulation requests
+_brain_session = requests.Session()
+_brain_session.headers.update({"Content-Type": "application/json"})
+
+# Rate limit state
+rate_limit_state = {
+    "limit": None,
+    "remaining": None,
+    "reset_seconds": None,
+    "last_updated": None
+}
+
+def _update_rate_limits(headers):
+    """Parse X-Ratelimit-* headers and store them."""
+    try:
+        if "x-ratelimit-limit" in headers:
+            rate_limit_state["limit"] = int(headers["x-ratelimit-limit"])
+        if "x-ratelimit-remaining" in headers:
+            rate_limit_state["remaining"] = int(headers["x-ratelimit-remaining"])
+        if "x-ratelimit-reset" in headers:
+            rate_limit_state["reset_seconds"] = int(headers["x-ratelimit-reset"])
+        rate_limit_state["last_updated"] = datetime.now(timezone.utc).isoformat()
+    except Exception:
+        pass
+
+def _apply_session_cookie(cookie_str):
+    """Set the JWT cookie on the persistent session."""
+    _brain_session.cookies.clear()
+    # Parse cookie string and set individual cookies
+    for part in cookie_str.split(";"):
+        part = part.strip()
+        if "=" in part:
+            k, v = part.split("=", 1)
+            _brain_session.cookies.set(k.strip(), v.strip())
+
 def get_brain_session():
-    session = requests.Session()
+    """Return the persistent session. Cookie is already set on it."""
     cookie_str = auth_state["cookie"].strip()
     
     # Auto-format raw JWT token if pasted without 't=' prefix
     if (cookie_str.startswith("eyJ") or cookie_str.startswith("teyJ")) and ";" not in cookie_str:
         if cookie_str.startswith("teyJ"):
-            cookie_str = cookie_str[1:] # strip accidental leading t
+            cookie_str = cookie_str[1:]
         cookie_str = f"t={cookie_str}"
         auth_state["cookie"] = cookie_str
-
-    headers = {
-        "Cookie": cookie_str,
-        "Content-Type": "application/json"
-    }
-    token = None
-    for part in cookie_str.split(";"):
-        part = part.strip()
-        if part.startswith("t="):
-            token = part[2:]
-            break
-            
-    if not token and (cookie_str.startswith("eyJ") or cookie_str.startswith("t=")):
-        token = cookie_str[2:] if cookie_str.startswith("t=") else cookie_str
-
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return session, headers
+    
+    _apply_session_cookie(cookie_str)
+    return _brain_session
 
 def authenticate_brain_user(email, password):
+    """Authenticate using Basic Auth. On success, store JWT cookie into persistent session."""
     try:
-        session = requests.Session()
-        resp = session.post("https://api.worldquantbrain.com/authentication", auth=(email, password), timeout=10)
+        # Use a fresh temp session for initial auth
+        temp_session = requests.Session()
+        resp = temp_session.post(
+            "https://api.worldquantbrain.com/authentication",
+            auth=(email, password),
+            timeout=15
+        )
+        
         if resp.status_code in [200, 201]:
+            # Collect cookies from response and store them
             cookie_parts = []
             for k, v in resp.cookies.items():
                 cookie_parts.append(f"{k}={v}")
             
+            # Also check Set-Cookie header directly
+            set_cookie = resp.headers.get("Set-Cookie", "")
+            if not cookie_parts and set_cookie:
+                # Extract t= JWT from Set-Cookie
+                for seg in set_cookie.split(","):
+                    seg = seg.strip()
+                    if seg.startswith("t="):
+                        jwt_part = seg.split(";")[0].strip()
+                        cookie_parts.append(jwt_part)
+                        break
+
             if cookie_parts:
-                auth_state["cookie"] = "; ".join(cookie_parts)
-            elif resp.headers.get("Set-Cookie"):
-                auth_state["cookie"] = resp.headers.get("Set-Cookie")
-                
+                cookie_str = "; ".join(cookie_parts)
+                auth_state["cookie"] = cookie_str
+                # Apply to persistent session immediately
+                _apply_session_cookie(cookie_str)
+            
             auth_state["user_email"] = email
             auth_state["authenticated"] = True
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
             save_auth_credentials()
+            print(f"[AUTH] Authenticated as {email}. Cookie: {auth_state['cookie'][:60]}...")
             return True, "Authenticated successfully with WorldQuant BRAIN", None, None
-        elif resp.status_code == 401 and ("persona" in resp.headers.get("WWW-Authenticate", "").lower() or "inquiry" in resp.text):
-            inquiry_id = None
-            try:
-                body = resp.json()
-                inquiry_id = body.get("inquiry")
-            except Exception:
-                pass
+
+        elif resp.status_code == 401:
+            www_auth = resp.headers.get("WWW-Authenticate", "")
+            location = resp.headers.get("Location", "")
+
+            if "persona" in www_auth.lower() or "inquiry" in location.lower():
+                # Parse inquiry ID from Location header
+                inquiry_id = None
+                if "inquiry=" in location:
+                    inquiry_id = location.split("inquiry=")[-1].split("&")[0]
                 
-            if not inquiry_id:
-                loc = resp.headers.get("Location", "")
-                if "inquiry=" in loc:
-                    inquiry_id = loc.split("inquiry=")[-1].split("&")[0]
+                if not inquiry_id:
+                    try:
+                        body = resp.json()
+                        inquiry_id = body.get("inquiry")
+                    except Exception:
+                        pass
 
-            persona_url = f"https://platform.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}" if inquiry_id else "https://platform.worldquantbrain.com"
+                # Persona URL to open in browser
+                if inquiry_id:
+                    persona_url = f"https://platform.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}"
+                else:
+                    # Fallback: build from response URL + Location header
+                    from urllib.parse import urljoin
+                    persona_url = urljoin(resp.url, location) if location else "https://platform.worldquantbrain.com"
 
-            auth_state["authenticated"] = False
-            auth_state["user_email"] = email
-            save_auth_credentials()
-            return False, f"Persona Biometric Verification required by WorldQuant BRAIN for {email}.", inquiry_id, persona_url
+                auth_state["authenticated"] = False
+                auth_state["user_email"] = email
+                save_auth_credentials()
+                print(f"[AUTH] Persona required for {email}. URL: {persona_url}")
+                return False, f"Face verification required for {email}. Open the link to complete.", inquiry_id, persona_url
+            else:
+                auth_state["authenticated"] = False
+                err_detail = ""
+                try:
+                    err_detail = resp.json().get("detail", resp.text)
+                except Exception:
+                    err_detail = resp.text
+                return False, f"Invalid credentials: {err_detail}", None, None
         else:
             auth_state["authenticated"] = False
-            return False, f"HTTP {resp.status_code}: {resp.text}", None, None
+            return False, f"Unexpected HTTP {resp.status_code}: {resp.text[:200]}", None, None
+
     except Exception as e:
         auth_state["authenticated"] = False
-        return False, str(e), None, None
+        return False, f"Connection error: {str(e)}", None, None
 
 def check_auth_status():
-    session, headers = get_brain_session()
+    session = get_brain_session()
     try:
-        resp = session.get("https://api.worldquantbrain.com/users/self", headers=headers, timeout=5)
+        resp = session.get("https://api.worldquantbrain.com/users/self", timeout=8)
         if resp.status_code == 200:
             data = resp.json()
             auth_state["authenticated"] = True
@@ -186,7 +248,7 @@ def check_auth_status():
             return True, auth_state["user_email"]
         else:
             auth_state["authenticated"] = False
-            return False, f"HTTP {resp.status_code}"
+            return False, f"HTTP {resp.status_code} — session may be expired. Please re-login."
     except Exception as e:
         auth_state["authenticated"] = False
         return False, str(e)
@@ -194,7 +256,7 @@ def check_auth_status():
 # -----------------------------------------------------------------------------
 # Core Simulation & API Functionality
 # -----------------------------------------------------------------------------
-def extract_metrics(data, session, headers):
+def extract_metrics(data, session, headers=None):
     if "is" in data and isinstance(data["is"], dict):
         if "sharpe" in data["is"]:
             return data["is"]
@@ -215,7 +277,7 @@ def extract_metrics(data, session, headers):
         alpha_url = f"https://api.worldquantbrain.com/alphas/{alpha_id}"
         for _ in range(3):
             try:
-                resp = session.get(alpha_url, headers=headers, timeout=5)
+                resp = session.get(alpha_url, timeout=5)
                 if resp.status_code == 200:
                     a_data = resp.json()
                     if "is" in a_data and isinstance(a_data["is"], dict):
@@ -226,131 +288,80 @@ def extract_metrics(data, session, headers):
                 time.sleep(1)
     return None
 
-def run_single_simulation(expression, settings, dry_run=False):
-    alpha_hash = get_alpha_hash(expression, settings)
-    cache = load_cache()
-    
-    # 1. Deduplication Cache Lookup
-    if alpha_hash in cache:
-        cached_entry = cache[alpha_hash]
-        return {
-            "status": "CACHED_DUPLICATE",
-            "alpha_id": cached_entry.get("alpha_id"),
-            "metrics": cached_entry.get("metrics"),
-            "failed_checks": cached_entry.get("failed_checks", []),
-            "cached": True,
-            "hash": alpha_hash
-        }
-        
-    session, headers = get_brain_session()
-    universe = settings.get("universe", "TOP3000")
-    decay = settings.get("decay", 2)
-    
-    # 2. Dry Run Simulation (Mocking)
-    if dry_run:
-        time.sleep(random.uniform(0.5, 1.2))
-        mock_success = random.random() < 0.8
-        if mock_success:
-            metrics = {
-                "sharpe": round(random.uniform(0.2, 2.4), 4),
-                "fitness": round(random.uniform(0.4, 2.2), 4),
-                "returns": round(random.uniform(-0.05, 0.35), 4),
-                "drawdown": round(random.uniform(-0.25, -0.01), 4),
-                "margin": round(random.uniform(0.00005, 0.00035), 6),
-                "turnover": round(random.uniform(0.05, 0.85), 4)
-            }
-            alpha_id = f"MOCK_{alpha_hash[:8].upper()}"
-            result = {
-                "status": "SUCCESS",
-                "alpha_id": alpha_id,
-                "metrics": metrics,
-                "failed_checks": [],
-                "universe": universe,
-                "decay": decay,
-                "cached": False,
-                "hash": alpha_hash
-            }
-            cache[alpha_hash] = result
-            save_cache(cache)
-            return result
-        else:
-            return {
-                "status": "FAILED",
-                "error": "Mock API simulation check failed",
-                "universe": universe,
-                "decay": decay,
-                "cached": False,
-                "hash": alpha_hash
-            }
-            
-    # 3. Live BRAIN Remote Simulation API
-    payload = {
+
+def _build_sim_payload(expression, settings):
+    """Build the simulation payload dict from expression + settings."""
+    return {
         "type": "REGULAR",
         "settings": {
             "instrumentType": settings.get("instrumentType", "EQUITY"),
             "region": settings.get("region", "USA"),
-            "universe": universe,
-            "delay": settings.get("delay", 1),
-            "decay": decay,
+            "universe": settings.get("universe", "TOP3000"),
+            "delay": int(settings.get("delay", 1)),
+            "decay": int(settings.get("decay", 0)),
             "neutralization": settings.get("neutralization", "INDUSTRY"),
-            "truncation": settings.get("truncation", 0.08),
+            "truncation": float(settings.get("truncation", 0.08)),
             "pasteurization": settings.get("pasteurization", "ON"),
             "nanHandling": settings.get("nanHandling", "ON"),
             "language": settings.get("language", "FASTEXPR"),
             "unitHandling": settings.get("unitHandling", "VERIFY"),
             "visualization": False
         },
-        "regular": expression
+        "regular": expression.strip()
     }
-    
-    backoff = 30
-    resp = None
-    for _ in range(5):
-        try:
-            resp = session.post("https://api.worldquantbrain.com/simulations", json=payload, headers=headers, timeout=15)
-            if resp.status_code == 429:
-                retry_sec = int(resp.headers.get("Retry-After", backoff))
-                time.sleep(retry_sec)
-                backoff = min(backoff * 2, 300)
-                continue
-            if resp.status_code in [201, 202]:
-                break
-            else:
-                return {"status": f"HTTP_{resp.status_code}", "error": resp.text, "hash": alpha_hash}
-        except Exception as e:
-            time.sleep(5)
-            
-    if not resp or resp.status_code not in [201, 202]:
-        return {"status": "REQUEST_FAILED", "error": "Could not connect to BRAIN API", "hash": alpha_hash}
 
-    status_url = resp.headers.get("Location")
-    if not status_url:
-        return {"status": "NO_LOCATION_HEADER", "error": "Location header missing", "hash": alpha_hash}
-    if not status_url.startswith("http"):
-        status_url = "https://api.worldquantbrain.com" + status_url
-        
+def _poll_simulation(session, status_url, alpha_hash, universe, decay):
+    """Poll a simulation URL until complete. Returns result dict."""
     poll_count = 0
-    while poll_count < 250:
+    cache = load_cache()
+    while poll_count < 300:
+        if cancel_event.is_set():
+            return {"status": "CANCELLED", "error": "Cancelled by user", "hash": alpha_hash}
         try:
-            poll_resp = session.get(status_url, headers=headers, timeout=10)
+            poll_resp = session.get(status_url, timeout=15)
+            _update_rate_limits(poll_resp.headers)
+
             if poll_resp.status_code == 429:
-                time.sleep(10)
+                wait = int(poll_resp.headers.get("Retry-After", 10))
+                print(f"[POLL] 429 rate limited on {status_url}, sleeping {wait}s")
+                time.sleep(wait)
                 continue
+
+            if poll_resp.status_code not in [200]:
+                return {"status": f"POLL_HTTP_{poll_resp.status_code}", "error": poll_resp.text[:200], "hash": alpha_hash}
+
             data = poll_resp.json()
-            status = data.get("status")
-            if status in ["COMPLETE", "COMPLETED"]:
+            retry_after = poll_resp.headers.get("Retry-After")
+
+            # Still running
+            if retry_after and float(retry_after) > 0:
+                wait = max(float(retry_after), 2)
+                time.sleep(wait)
+                poll_count += 1
+                continue
+
+            # Check status field
+            status = data.get("status", "")
+            if status in ["COMPLETE", "WARNING"]:
                 alpha_id = data.get("alpha")
                 failed_checks = []
                 metrics = None
+
                 if alpha_id and isinstance(alpha_id, str):
-                    a_resp = session.get(f"https://api.worldquantbrain.com/alphas/{alpha_id}", headers=headers, timeout=10)
-                    if a_resp.status_code == 200:
-                        a_data = a_resp.json()
-                        metrics = a_data.get("is")
-                        checks = a_data.get("is", {}).get("checks", [])
-                        failed_checks = [c["name"] for c in checks if c.get("result") == "FAIL"]
-                if not metrics:
-                    metrics = extract_metrics(data, session, headers)
+                    try:
+                        a_resp = session.get(f"https://api.worldquantbrain.com/alphas/{alpha_id}", timeout=10)
+                        if a_resp.status_code == 200:
+                            a_data = a_resp.json()
+                            metrics = a_data.get("is") or {}
+                            checks = a_data.get("is", {}).get("checks", [])
+                            failed_checks = [c["name"] for c in checks if c.get("result") == "FAIL"]
+                            print(f"[SIM] Complete: alpha={alpha_id} sharpe={metrics.get('sharpe')} fails={failed_checks}")
+                    except Exception as e:
+                        print(f"[SIM] Error fetching alpha {alpha_id}: {e}")
+
+                if metrics is None:
+                    metrics = extract_metrics(data, session, None)
+
                 if metrics:
                     res = {
                         "status": "SUCCESS",
@@ -366,30 +377,125 @@ def run_single_simulation(expression, settings, dry_run=False):
                     save_cache(cache)
                     return res
                 else:
-                    return {"status": "METRICS_EXTRACTION_FAILED", "error": "Metrics unavailable", "hash": alpha_hash}
-            elif status in ["FAILED", "ERROR"]:
-                err = data.get("message") or data.get("error") or "Simulation error"
+                    return {"status": "METRICS_MISSING", "alpha_id": alpha_id, "error": "Simulation complete but metrics unavailable", "hash": alpha_hash}
+
+            elif status in ["FAILED", "ERROR", "TIMEOUT", "CANCEL", "CANCELLED"]:
+                err = data.get("message") or data.get("error") or f"Simulation {status}"
+                print(f"[SIM] Failed: {err}")
                 return {"status": status, "error": err, "failed_checks": [], "hash": alpha_hash}
-            
-            retry_wait = int(poll_resp.headers.get("Retry-After", 3))
-            time.sleep(max(retry_wait, 2))
-            poll_count += 1
-        except Exception as e:
+
+            # Status is WAITING or SIMULATING — keep polling
             time.sleep(3)
             poll_count += 1
-            
-    return {"status": "TIMEOUT", "error": "Exceeded maximum polling limit", "hash": alpha_hash}
+
+        except Exception as e:
+            print(f"[POLL] Exception on {status_url}: {e}")
+            time.sleep(5)
+            poll_count += 1
+
+    return {"status": "TIMEOUT", "error": "Exceeded 300 polling attempts", "hash": alpha_hash}
+
+def run_single_simulation(expression, settings, dry_run=False):
+    alpha_hash = get_alpha_hash(expression, settings)
+    cache = load_cache()
+    universe = settings.get("universe", "TOP3000")
+    decay = settings.get("decay", 0)
+
+    # 1. Deduplication Cache Lookup
+    if alpha_hash in cache:
+        cached_entry = cache[alpha_hash]
+        print(f"[CACHE] Hit for {alpha_hash[:12]}")
+        return {
+            "status": "CACHED_DUPLICATE",
+            "alpha_id": cached_entry.get("alpha_id"),
+            "metrics": cached_entry.get("metrics"),
+            "failed_checks": cached_entry.get("failed_checks", []),
+            "cached": True,
+            "hash": alpha_hash
+        }
+
+    # 2. Dry Run (Mock)
+    if dry_run:
+        time.sleep(random.uniform(0.3, 0.8))
+        if random.random() < 0.8:
+            metrics = {
+                "sharpe": round(random.uniform(0.2, 2.4), 4),
+                "fitness": round(random.uniform(0.4, 2.2), 4),
+                "returns": round(random.uniform(-0.05, 0.35), 4),
+                "drawdown": round(random.uniform(-0.25, -0.01), 4),
+                "margin": round(random.uniform(0.00005, 0.00035), 6),
+                "turnover": round(random.uniform(0.05, 0.85), 4)
+            }
+            alpha_id = f"MOCK_{alpha_hash[:8].upper()}"
+            result = {"status": "SUCCESS", "alpha_id": alpha_id, "metrics": metrics,
+                      "failed_checks": [], "universe": universe, "decay": decay, "cached": False, "hash": alpha_hash}
+            cache[alpha_hash] = result
+            save_cache(cache)
+            return result
+        else:
+            return {"status": "FAILED", "error": "Mock check failed", "universe": universe, "decay": decay, "cached": False, "hash": alpha_hash}
+
+    # 3. Live BRAIN Simulation
+    session = get_brain_session()
+    payload = _build_sim_payload(expression, settings)
+
+    print(f"[SIM] Submitting: {expression[:60]} | {settings.get('universe')} delay={settings.get('delay')} neut={settings.get('neutralization')}")
+
+    backoff = 15
+    resp = None
+    for attempt in range(6):
+        if cancel_event.is_set():
+            return {"status": "CANCELLED", "error": "Cancelled by user", "hash": alpha_hash}
+        try:
+            resp = session.post("https://api.worldquantbrain.com/simulations", json=payload, timeout=20)
+            _update_rate_limits(resp.headers)
+            print(f"[SIM] POST attempt {attempt+1}: HTTP {resp.status_code}")
+
+            if resp.status_code == 401:
+                print(f"[SIM] 401 Unauthorized — session expired or not authenticated. Cookie: {auth_state['cookie'][:40]}")
+                auth_state["authenticated"] = False
+                return {"status": "AUTH_EXPIRED", "error": "Session expired. Please re-login to WorldQuant BRAIN.", "hash": alpha_hash}
+
+            if resp.status_code == 429:
+                wait = int(resp.headers.get("Retry-After", backoff))
+                print(f"[SIM] Rate limited, sleeping {wait}s (remaining={rate_limit_state.get('remaining')})")
+                time.sleep(wait)
+                backoff = min(backoff * 2, 120)
+                continue
+
+            if resp.status_code in [201, 202]:
+                break
+
+            # Bad request — don't retry
+            err_text = resp.text[:400]
+            print(f"[SIM] Error response: {err_text}")
+            return {"status": f"HTTP_{resp.status_code}", "error": err_text, "hash": alpha_hash}
+
+        except Exception as e:
+            print(f"[SIM] Request exception: {e}")
+            time.sleep(5)
+
+    if not resp or resp.status_code not in [201, 202]:
+        return {"status": "REQUEST_FAILED", "error": "Could not reach BRAIN API after retries", "hash": alpha_hash}
+
+    status_url = resp.headers.get("Location", "")
+    if not status_url:
+        return {"status": "NO_LOCATION", "error": "No Location header in simulation response", "hash": alpha_hash}
+    if not status_url.startswith("http"):
+        status_url = "https://api.worldquantbrain.com" + status_url
+
+    print(f"[SIM] Polling: {status_url}")
+    return _poll_simulation(session, status_url, alpha_hash, universe, decay)
 
 def submit_alpha_to_brain(alpha_id, dry_run=False):
     if dry_run or alpha_id.startswith("MOCK_"):
-        return True, "Mock Alpha Submitted Successfully"
-    session, headers = get_brain_session()
+        return True, "Mock submission"
+    session = get_brain_session()
     try:
-        resp = session.post("https://api.worldquantbrain.com/submissions", json={"alpha": alpha_id}, headers=headers, timeout=10)
+        resp = session.post("https://api.worldquantbrain.com/submissions", json={"alpha": alpha_id}, timeout=10)
         if resp.status_code in [200, 201, 202]:
-            return True, f"Submitted successfully (HTTP {resp.status_code})"
-        else:
-            return False, f"HTTP {resp.status_code}: {resp.text}"
+            return True, f"Submitted (HTTP {resp.status_code})"
+        return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
     except Exception as e:
         return False, str(e)
 
@@ -570,7 +676,8 @@ def get_auth_status():
         "authenticated": ok,
         "user_email": auth_state["user_email"],
         "details": details,
-        "last_checked": auth_state["last_checked"]
+        "last_checked": auth_state["last_checked"],
+        "rate_limit": rate_limit_state
     })
 
 @app.route("/api/auth/update", methods=["POST"])
@@ -579,9 +686,15 @@ def update_auth():
     new_cookie = data.get("cookie")
     if new_cookie:
         auth_state["cookie"] = new_cookie.strip()
+        _apply_session_cookie(new_cookie.strip())  # Apply to persistent session
         ok, details = check_auth_status()
         return jsonify({"success": ok, "details": details, "user_email": auth_state["user_email"]})
     return jsonify({"success": False, "error": "No cookie string provided"}), 400
+
+@app.route("/api/simulations/ratelimit", methods=["GET"])
+def get_rate_limit():
+    """Return current rate limit state from last simulation POST."""
+    return jsonify(rate_limit_state)
 
 @app.route("/api/auth/login", methods=["POST"])
 def login_auth():

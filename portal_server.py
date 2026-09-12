@@ -42,6 +42,21 @@ auth_state = {
 
 
 def load_auth_credentials():
+    # 1. Check ~/.brain_credentials (official WorldQuant format: ["email", "password"])
+    brain_cred_path = os.path.expanduser("~/.brain_credentials")
+    if os.path.exists(brain_cred_path):
+        try:
+            with open(brain_cred_path, "r", encoding="utf-8") as f:
+                creds = json.load(f)
+                if isinstance(creds, list) and len(creds) >= 2:
+                    auth_state["saved_email"] = creds[0]
+                    auth_state["saved_password"] = creds[1]
+                    if not auth_state.get("user_email"):
+                        auth_state["user_email"] = creds[0]
+        except Exception as e:
+            print(f"Error loading ~/.brain_credentials: {e}")
+
+    # 2. Check auth_credentials.json
     if os.path.exists(AUTH_FILE):
         try:
             with open(AUTH_FILE, "r", encoding="utf-8") as f:
@@ -53,7 +68,7 @@ def load_auth_credentials():
         except Exception as e:
             print(f"Error loading auth credentials: {e}")
 
-def save_auth_credentials():
+def save_auth_credentials(email=None, password=None):
     try:
         with open(AUTH_FILE, "w", encoding="utf-8") as f:
             json.dump({
@@ -62,6 +77,16 @@ def save_auth_credentials():
             }, f, indent=2)
     except Exception as e:
         print(f"Error saving auth credentials: {e}")
+
+    if email and password:
+        try:
+            brain_cred_path = os.path.expanduser("~/.brain_credentials")
+            with open(brain_cred_path, "w", encoding="utf-8") as f:
+                json.dump([email, password], f, indent=2)
+            auth_state["saved_email"] = email
+            auth_state["saved_password"] = password
+        except Exception as e:
+            print(f"Error saving ~/.brain_credentials: {e}")
 
 load_auth_credentials()
 
@@ -186,7 +211,7 @@ def authenticate_brain_user(email, password):
             auth_state["user_email"] = email
             auth_state["authenticated"] = True
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
-            save_auth_credentials()
+            save_auth_credentials(email, password)
             print(f"[AUTH] Authenticated as {email}. Cookie: {auth_state['cookie'][:60]}...")
             return True, "Authenticated successfully with WorldQuant BRAIN", None, None
 

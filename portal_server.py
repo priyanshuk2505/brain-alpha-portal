@@ -573,7 +573,7 @@ def get_results():
                 decay = row[9].strip()
                 neutralization = row[10].strip()
                 checks_str = row[11].strip()
-                code = row[12].strip() if len(row) > 12 else ""
+                code = row[-1].strip() if len(row) > 1 else ""
                 
                 failed_checks = checks_str.split(";") if checks_str else []
                 alphas.append({

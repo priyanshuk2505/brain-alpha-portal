@@ -204,6 +204,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Cancel Batch Simulation Button
+        const cancelBtn = document.getElementById('cancelBatchBtn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', async () => {
+                try {
+                    const resp = await fetch('/api/simulations/cancel', { method: 'POST' });
+                    const data = await resp.json();
+                    if (data.success) {
+                        showNotification('Batch simulation cancelled and queue stopped.', 'warning');
+                        fetchQueueAndResults();
+                    }
+                } catch (e) {
+                    showNotification('Error cancelling batch.', 'error');
+                }
+            });
+        }
+
         // Search & Multi-Filter Event Listeners
         if (elements.searchInput) elements.searchInput.addEventListener('input', renderResultsTable);
         if (elements.filterStatus) elements.filterStatus.addEventListener('change', renderResultsTable);

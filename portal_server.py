@@ -550,6 +550,27 @@ def enqueue_batch():
         "status": "RUNNING"
     })
 
+@app.route("/api/simulations/cancel", methods=["POST"])
+def cancel_batch():
+    with jobs_lock:
+        # Clear queued items
+        cancelled_count = 0
+        while not job_queue.empty():
+            try:
+                job_queue.get_nowait()
+                job_queue.task_done()
+                cancelled_count += 1
+            except Exception:
+                break
+                
+        # Mark all running/pending batches as CANCELLED
+        for b_id, b_data in batch_jobs.items():
+            if b_data.get("status") in ["RUNNING", "PENDING"]:
+                b_data["status"] = "CANCELLED"
+                b_data["end_time"] = datetime.now(timezone.utc).isoformat()
+                
+    return jsonify({"success": True, "message": "Stopped active simulations and cancelled queue", "cancelled_items": cancelled_count})
+
 @app.route("/api/simulations/batches", methods=["GET"])
 def get_batches():
     with jobs_lock:

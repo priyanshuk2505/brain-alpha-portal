@@ -98,40 +98,56 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
 
                 <div class="settings-grid">
                     <div class="form-group">
+                        <label>Region</label>
+                        <select id="settingRegion" class="form-control">
+                            <option value="USA" selected>USA (United States)</option>
+                            <option value="GLB">GLB (Global)</option>
+                            <option value="EUR">EUR (Europe)</option>
+                            <option value="ASI">ASI (Asia-Pacific)</option>
+                            <option value="CHN">CHN (China)</option>
+                            <option value="KOR">KOR (South Korea)</option>
+                            <option value="HKG">HKG (Hong Kong)</option>
+                            <option value="IND">IND (India)</option>
+                            <option value="DEU">DEU (Germany)</option>
+                            <option value="GBR">GBR (United Kingdom)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label>Universe</label>
                         <select id="settingUniverse" class="form-control">
-                            <option value="TOP3000" selected>TOP3000 (Top 3000 US)</option>
-                            <option value="TOP2000">TOP2000 (Top 2000 US)</option>
-                            <option value="TOP1000">TOP1000 (Top 1000 US)</option>
-                            <option value="TOP500">TOP500 (Top 500 Large Cap)</option>
-                            <option value="TOP200">TOP200 (Top 200 Large Cap)</option>
-                            <option value="TOP100">TOP100 (Top 100 Mega Cap)</option>
-                            <option value="ILLIQUID">ILLIQUID (Small & Illiquid)</option>
-                            <option value="ALL_EQUITIES">ALL_EQUITIES (All US Equities)</option>
+                            <option value="TOP3000" selected>TOP3000</option>
+                            <option value="TOP2000">TOP2000</option>
+                            <option value="TOP1000">TOP1000</option>
+                            <option value="TOP500">TOP500</option>
+                            <option value="TOP200">TOP200</option>
+                            <option value="ILLIQUID_MINVOL1M">ILLIQUID_MINVOL1M</option>
+                            <option value="TOPSP500">TOPSP500</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label>Neutralization</label>
                         <select id="settingNeutralization" class="form-control">
-                            <option value="INDUSTRY" selected>INDUSTRY</option>
-                            <option value="SUBINDUSTRY">SUBINDUSTRY</option>
-                            <option value="SECTOR">SECTOR</option>
-                            <option value="MARKET">MARKET</option>
-                            <option value="STATBND">STATBND</option>
-                            <option value="NONE">NONE</option>
+                            <option value="INDUSTRY" selected>Industry</option>
+                            <option value="SUBINDUSTRY">Subindustry</option>
+                            <option value="SECTOR">Sector</option>
+                            <option value="MARKET">Market</option>
+                            <option value="NONE">None</option>
+                            <option value="RAM">RAM</option>
+                            <option value="STATISTICAL">Statistical</option>
+                            <option value="CROWDING">Crowding Factors</option>
+                            <option value="FAST">Fast Factors</option>
+                            <option value="SLOW">Slow Factors</option>
+                            <option value="SLOW_FAST">Slow + Fast Factors</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label>Delay</label>
                         <select id="settingDelay" class="form-control">
-                            <option value="1" selected>Delay 1 (Next Day)</option>
-                            <option value="0">Delay 0 (Same Day)</option>
-                            <option value="2">Delay 2 (2 Days)</option>
-                            <option value="3">Delay 3 (3 Days)</option>
-                            <option value="5">Delay 5 (5 Days)</option>
-                            <option value="10">Delay 10 (10 Days)</option>
+                            <option value="1" selected>1 (Next Day)</option>
+                            <option value="0">0 (Same Day)</option>
                         </select>
                     </div>
 
@@ -148,16 +164,6 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                             <option value="10">10</option>
                             <option value="15">15</option>
                             <option value="20">20</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Region</label>
-                        <select id="settingRegion" class="form-control">
-                            <option value="USA" selected>USA (United States)</option>
-                            <option value="EUR">EUR (Europe)</option>
-                            <option value="ASI">ASI (Asia-Pacific)</option>
-                            <option value="GLB">GLB (Global)</option>
                         </select>
                     </div>
 
@@ -228,9 +234,14 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
         <section class="dashboard-panel">
             <!-- Active Jobs Queue Panel -->
             <div class="card glass-card">
-                <div class="card-header">
-                    <h2><i class="fa-solid fa-list-check"></i> Active Batch Queue</h2>
-                    <span id="queueStatsBadge" class="badge badge-blue">0 Jobs Queued</span>
+                <div class="card-header flex-wrap">
+                    <div class="header-title-group">
+                        <h2><i class="fa-solid fa-list-check"></i> Active Batch Queue</h2>
+                        <span id="queueStatsBadge" class="badge badge-blue">0 Jobs Queued</span>
+                    </div>
+                    <button id="cancelBatchBtn" class="btn btn-danger btn-sm">
+                        <i class="fa-solid fa-circle-stop"></i> Stop & Cancel Batch
+                    </button>
                 </div>
 
                 <div id="activeQueueContainer" class="queue-container">

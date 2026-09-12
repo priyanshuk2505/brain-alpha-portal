@@ -464,8 +464,8 @@ def enqueue_batch():
     data = request.get_json() or {}
     raw_expressions = data.get("expressions", [])
     settings = data.get("settings", {})
-    dry_run = data.get("dry_run", False)
-    auto_submit = data.get("auto_submit", False)
+    dry_run = data.get("dry_run", False) or settings.get("dry_run", False)
+    auto_submit = data.get("auto_submit", False) or settings.get("auto_submit", False)
     
     if isinstance(raw_expressions, str):
         # Line-separated expressions

@@ -146,18 +146,32 @@ def authenticate_brain_user(email, password):
             auth_state["authenticated"] = True
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
             save_auth_credentials()
-            return True, "Authenticated successfully with WorldQuant BRAIN"
+            return True, "Authenticated successfully with WorldQuant BRAIN", None, None
         elif resp.status_code == 401 and ("persona" in resp.headers.get("WWW-Authenticate", "").lower() or "inquiry" in resp.text):
+            inquiry_id = None
+            try:
+                body = resp.json()
+                inquiry_id = body.get("inquiry")
+            except Exception:
+                pass
+                
+            if not inquiry_id:
+                loc = resp.headers.get("Location", "")
+                if "inquiry=" in loc:
+                    inquiry_id = loc.split("inquiry=")[-1].split("&")[0]
+
+            persona_url = f"https://platform.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}" if inquiry_id else "https://platform.worldquantbrain.com"
+
             auth_state["authenticated"] = False
             auth_state["user_email"] = email
             save_auth_credentials()
-            return False, f"Persona Biometric Verification required by WorldQuant BRAIN for {email}. Please log in at platform.worldquantbrain.com in your browser to complete verification, then paste your 't' cookie or Authorization token into the Cookie tab."
+            return False, f"Persona Biometric Verification required by WorldQuant BRAIN for {email}.", inquiry_id, persona_url
         else:
             auth_state["authenticated"] = False
-            return False, f"HTTP {resp.status_code}: {resp.text}"
+            return False, f"HTTP {resp.status_code}: {resp.text}", None, None
     except Exception as e:
         auth_state["authenticated"] = False
-        return False, str(e)
+        return False, str(e), None, None
 
 def check_auth_status():
     session, headers = get_brain_session()
@@ -523,8 +537,15 @@ def login_auth():
     password = data.get("password")
     if not email or not password:
         return jsonify({"success": False, "message": "Email and password are required"}), 400
-    ok, details = authenticate_brain_user(email, password)
-    return jsonify({"success": ok, "message": details, "user_email": auth_state["user_email"]})
+    ok, details, inquiry_id, persona_url = authenticate_brain_user(email, password)
+    return jsonify({
+        "success": ok,
+        "message": details,
+        "user_email": auth_state["user_email"],
+        "requires_persona": bool(inquiry_id),
+        "inquiry_id": inquiry_id,
+        "persona_url": persona_url
+    })
 
 @app.route("/api/simulations/batch", methods=["POST"])
 def enqueue_batch():

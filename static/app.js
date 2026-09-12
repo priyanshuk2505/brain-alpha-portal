@@ -282,6 +282,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.loginBrainBtn) elements.loginBrainBtn.addEventListener('click', handleEmailPasswordLogin);
         if (elements.biometricAuthBtn) elements.biometricAuthBtn.addEventListener('click', handleBiometricAuth);
 
+        const launchPersonaBtn = document.getElementById('launchPersonaBtn');
+        if (launchPersonaBtn) launchPersonaBtn.addEventListener('click', launchPersonaScan);
+
+        const checkPersonaDoneBtn = document.getElementById('checkPersonaDoneBtn');
+        if (checkPersonaDoneBtn) {
+            checkPersonaDoneBtn.addEventListener('click', async () => {
+                showNotification('Checking auth status with BRAIN...', 'info');
+                await checkAuthStatus();
+            });
+        }
+
         // Exports
         if (elements.exportCsvBtn) {
             elements.exportCsvBtn.addEventListener('click', () => {
@@ -317,9 +328,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let activePersonaUrl = null;
+    let activeInquiryId = null;
+
     async function handleEmailPasswordLogin() {
         const email = elements.loginEmailInput.value.trim();
         const password = elements.loginPasswordInput.value.trim();
+        const personaContainer = document.getElementById('personaContainer');
 
         if (!email || !password) {
             showNotification('Please enter both Email and Password.', 'warning');
@@ -328,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         elements.loginBrainBtn.disabled = true;
         elements.loginBrainBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...`;
+        if (personaContainer) personaContainer.style.display = 'none';
 
         try {
             const resp = await fetch('/api/auth/login', {
@@ -342,6 +358,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.cookieModal.classList.remove('active');
                 elements.loginPasswordInput.value = '';
                 checkAuthStatus();
+            } else if (data.requires_persona) {
+                activePersonaUrl = data.persona_url;
+                activeInquiryId = data.inquiry_id;
+                
+                showNotification('Face Verification Required! Click "Complete Face Scan" below.', 'warning');
+                if (personaContainer) {
+                    personaContainer.style.display = 'block';
+                }
             } else {
                 showNotification(`Login Failed: ${data.message || 'Invalid Credentials'}`, 'error');
             }
@@ -350,6 +374,39 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             elements.loginBrainBtn.disabled = false;
             elements.loginBrainBtn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Log In & Authorize Session`;
+        }
+    }
+
+    function launchPersonaScan() {
+        if (!activePersonaUrl && !activeInquiryId) {
+            showNotification('No active Persona Face Scan inquiry found.', 'error');
+            return;
+        }
+
+        if (window.Persona && activeInquiryId) {
+            try {
+                const client = new Persona.Client({
+                    inquiryId: activeInquiryId,
+                    onComplete: ({ inquiryId, status, fields }) => {
+                        showNotification('Face Scan Complete! Validating session...', 'success');
+                        setTimeout(checkAuthStatus, 2000);
+                    },
+                    onCancel: () => showNotification('Face Scan cancelled.', 'info'),
+                    onError: (error) => console.log('Persona SDK Error:', error)
+                });
+                client.open();
+                return;
+            } catch (e) {
+                console.log('Persona SDK launch fallback to Popup window');
+            }
+        }
+
+        // Popup Window Fallback
+        const popup = window.open(activePersonaUrl, 'WorldQuantPersonaAuth', 'width=650,height=750,scrollbars=yes,resizable=yes');
+        if (popup) {
+            showNotification('Opened Face Scan in secure window. Complete face login, then click "Verify Completed Face Scan".', 'info');
+        } else {
+            showNotification('Popup blocked! Please allow popups or open platform.worldquantbrain.com directly.', 'error');
         }
     }
 

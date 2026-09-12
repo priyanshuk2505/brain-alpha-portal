@@ -9,8 +9,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
+    <!-- Chart.js & Persona SDK -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.withpersona.com/dist/persona-v4.9.0.js"></script>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="dark-theme">
@@ -389,6 +390,22 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                     <button id="loginBrainBtn" class="btn btn-primary btn-block margin-top">
                         <i class="fa-solid fa-right-to-bracket"></i> Log In & Authorize Session
                     </button>
+
+                    <!-- Persona Face Verification Card -->
+                    <div id="personaContainer" class="card glass-card margin-top" style="display: none; border: 1px solid rgba(0, 242, 254, 0.4); background: rgba(15, 23, 42, 0.85); padding: 15px; border-radius: 8px;">
+                        <div class="text-center">
+                            <i class="fa-solid fa-camera text-gradient" style="font-size: 2.2rem; margin-bottom: 10px; display: inline-block;"></i>
+                            <h4 style="color: #38bdf8; font-weight: 600; margin-bottom: 6px;">Face Login Verification Required</h4>
+                            <p class="sub-text" style="font-size: 0.85rem; margin-bottom: 15px; color: #94a3b8;">WorldQuant BRAIN requested Face ID / Persona biometric scan for your session.</p>
+                            
+                            <button id="launchPersonaBtn" class="btn btn-primary btn-glow btn-block" style="background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); font-weight: 600;">
+                                <i class="fa-solid fa-camera"></i> Complete Face Scan (Persona)
+                            </button>
+                            <button id="checkPersonaDoneBtn" class="btn btn-secondary btn-block margin-top" style="margin-top: 8px;">
+                                <i class="fa-solid fa-rotate-right"></i> Verify Completed Face Scan
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab 2: Biometric / Touch ID -->

@@ -27,6 +27,7 @@ WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(WORKSPACE_DIR, "simulation_cache.json")
 RESULTS_CSV = os.path.join(WORKSPACE_DIR, "simulation_results.csv")
 ELITE_FILE = os.path.join(WORKSPACE_DIR, "elite_alphas.txt")
+AUTH_FILE = os.path.join(WORKSPACE_DIR, "auth_credentials.json")
 
 # Default User Cookie from alpha_factory
 DEFAULT_COOKIE = "_fbp=fb.1.1778595947954.838983336151760867; _ga=GA1.1.687920460.1778595944; _ga_9RN6WVT1K1=GS2.1.s1781261144$o102$g1$t1781261272$j59$l0$h0; _rdt_uuid=1778595944372.55b2243d-1bc9-440f-a27d-c17c7e25a64c; t=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJnazFBcmtJOTJuN3RDUFQ2Vk9NU0FwMDgwTkxGYXNERiIsImV4cCI6MTc4MTI3NTY1MiwiYW1yIjpbInB3ZCIsImZhY2UiLCJjYXB0Y2hhIl19.BnWNMKcA2HPmJvAizMg9APzXLFHJAMfbkhiwDtmevGg; _gcl_au=1.1.326319197.1778595941.1284668449.1781175694.1781175694; _ga_FXKNEPLB1N=GS2.1.s1779733566$o7$g0$t1779733566$j60$l0$h0; __zlcmid=1XcoWMCkz0Gybrj; cookieyes-consent=consentid:V3N1Q1lGeXMxZWJjQU5ienR2TEtiUnlGMTdIN3k3cFA,consent:yes,action:yes,necessary:yes,functional:yes,analytics:yes,performance:yes,advertisement:yes,other:yes"
@@ -35,9 +36,33 @@ DEFAULT_COOKIE = "_fbp=fb.1.1778595947954.838983336151760867; _ga=GA1.1.68792046
 auth_state = {
     "cookie": DEFAULT_COOKIE,
     "user_email": "priyanshubhadani25@gmail.com",
-    "authenticated": True,
+    "authenticated": False,
     "last_checked": None
 }
+
+def load_auth_credentials():
+    if os.path.exists(AUTH_FILE):
+        try:
+            with open(AUTH_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if data.get("cookie"):
+                    auth_state["cookie"] = data.get("cookie")
+                if data.get("user_email"):
+                    auth_state["user_email"] = data.get("user_email")
+        except Exception as e:
+            print(f"Error loading auth credentials: {e}")
+
+def save_auth_credentials():
+    try:
+        with open(AUTH_FILE, "w", encoding="utf-8") as f:
+            json.dump({
+                "cookie": auth_state["cookie"],
+                "user_email": auth_state["user_email"]
+            }, f, indent=2)
+    except Exception as e:
+        print(f"Error saving auth credentials: {e}")
+
+load_auth_credentials()
 
 # In-Memory Cache and Batch Jobs Storage
 cache_lock = threading.Lock()
@@ -120,7 +145,13 @@ def authenticate_brain_user(email, password):
             auth_state["user_email"] = email
             auth_state["authenticated"] = True
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
+            save_auth_credentials()
             return True, "Authenticated successfully with WorldQuant BRAIN"
+        elif resp.status_code == 401 and ("persona" in resp.headers.get("WWW-Authenticate", "").lower() or "inquiry" in resp.text):
+            auth_state["authenticated"] = False
+            auth_state["user_email"] = email
+            save_auth_credentials()
+            return False, f"Persona Biometric Verification required by WorldQuant BRAIN for {email}. Please log in at platform.worldquantbrain.com in your browser to complete verification, then paste your 't' cookie or Authorization token into the Cookie tab."
         else:
             auth_state["authenticated"] = False
             return False, f"HTTP {resp.status_code}: {resp.text}"
@@ -137,6 +168,7 @@ def check_auth_status():
             auth_state["authenticated"] = True
             auth_state["user_email"] = data.get("email") or data.get("username") or auth_state["user_email"]
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
+            save_auth_credentials()
             return True, auth_state["user_email"]
         else:
             auth_state["authenticated"] = False

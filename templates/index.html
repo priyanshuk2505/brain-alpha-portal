@@ -392,21 +392,41 @@ normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1)
                     </button>
 
                     <!-- Persona Face Verification Card -->
-                    <div id="personaContainer" class="card glass-card margin-top" style="display: none; border: 1px solid rgba(0, 242, 254, 0.4); background: rgba(15, 23, 42, 0.85); padding: 15px; border-radius: 8px;">
-                        <div class="text-center">
-                            <i class="fa-solid fa-camera text-gradient" style="font-size: 2.2rem; margin-bottom: 10px; display: inline-block;"></i>
-                            <h4 style="color: #38bdf8; font-weight: 600; margin-bottom: 6px;">Face Login Verification Required</h4>
-                            <p class="sub-text" style="font-size: 0.85rem; margin-bottom: 15px; color: #94a3b8;">WorldQuant BRAIN requested Face ID / Persona biometric scan for your session.</p>
-                            
-                            <button id="launchPersonaBtn" class="btn btn-primary btn-glow btn-block" style="background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); font-weight: 600;">
-                                <i class="fa-solid fa-camera"></i> Complete Face Scan (Persona)
+                    <div id="personaContainer" class="card glass-card margin-top" style="display: none; border: 1px solid rgba(0, 242, 254, 0.4); background: rgba(15, 23, 42, 0.9); padding: 16px; border-radius: 10px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom: 12px;">
+                            <i class="fa-solid fa-camera" style="font-size: 1.6rem; background: linear-gradient(135deg,#00f2fe,#4facfe); -webkit-background-clip:text; -webkit-text-fill-color:transparent;"></i>
+                            <div>
+                                <h4 style="color:#38bdf8; font-weight:700; margin:0; font-size:0.95rem;">Face Login Verification Required</h4>
+                                <p style="color:#64748b; font-size:0.78rem; margin:2px 0 0;">WorldQuant BRAIN requires Face ID before granting access</p>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px; font-size:0.8rem; color:#94a3b8;">
+                            <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(56,189,248,0.07); border-radius:6px;">
+                                <span style="width:20px; height:20px; background:linear-gradient(135deg,#00f2fe,#4facfe); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#0f172a; flex-shrink:0;">1</span>
+                                Click <b style="color:#e2e8f0;">"Open Face Scan"</b> — opens WorldQuant camera page in a new tab
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(56,189,248,0.07); border-radius:6px;">
+                                <span style="width:20px; height:20px; background:linear-gradient(135deg,#00f2fe,#4facfe); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#0f172a; flex-shrink:0;">2</span>
+                                Allow camera access and complete the face scan in that tab
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(56,189,248,0.07); border-radius:6px;">
+                                <span style="width:20px; height:20px; background:linear-gradient(135deg,#00f2fe,#4facfe); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#0f172a; flex-shrink:0;">3</span>
+                                Come back here and click <b style="color:#e2e8f0;">"Done — Verify Session"</b>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:8px; flex-direction: column;">
+                            <button id="launchPersonaBtn" class="btn btn-primary btn-glow btn-block" style="background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); font-weight: 700; letter-spacing:0.01em; padding: 11px;">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>&nbsp; Open Face Scan (New Tab)
                             </button>
-                            <button id="checkPersonaDoneBtn" class="btn btn-secondary btn-block margin-top" style="margin-top: 8px;">
-                                <i class="fa-solid fa-rotate-right"></i> Verify Completed Face Scan
+                            <button id="checkPersonaDoneBtn" class="btn btn-secondary btn-block" style="padding: 10px;">
+                                <i class="fa-solid fa-circle-check"></i>&nbsp; Done — Verify Session
                             </button>
                         </div>
                     </div>
                 </div>
+
 
                 <!-- Tab 2: Biometric / Touch ID -->
                 <div id="authBioTab" class="auth-tab-content">

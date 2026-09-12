@@ -288,10 +288,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkPersonaDoneBtn = document.getElementById('checkPersonaDoneBtn');
         if (checkPersonaDoneBtn) {
             checkPersonaDoneBtn.addEventListener('click', async () => {
-                showNotification('Checking auth status with BRAIN...', 'info');
-                await checkAuthStatus();
+                const btn = checkPersonaDoneBtn;
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying...`;
+
+                // Re-attempt login with stored email/password after face scan
+                const email = elements.loginEmailInput.value.trim();
+                const password = elements.loginPasswordInput.value.trim();
+
+                if (email && password) {
+                    try {
+                        const resp = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password })
+                        });
+                        const data = await resp.json();
+
+                        if (data.success) {
+                            showNotification(`Face login verified! Authenticated as ${data.user_email}`, 'success');
+                            const personaContainer = document.getElementById('personaContainer');
+                            if (personaContainer) personaContainer.style.display = 'none';
+                            elements.cookieModal.classList.remove('active');
+                            checkAuthStatus();
+                        } else if (data.requires_persona) {
+                            showNotification('Face verification still pending. Please complete the face scan in the new tab first.', 'warning');
+                        } else {
+                            showNotification(`Session verified: ${data.message}`, 'info');
+                            await checkAuthStatus();
+                        }
+                    } catch(e) {
+                        showNotification('Could not verify. Checking auth status...', 'warning');
+                        await checkAuthStatus();
+                    }
+                } else {
+                    showNotification('Checking auth status with BRAIN...', 'info');
+                    await checkAuthStatus();
+                }
+
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Verify Completed Face Scan`;
             });
         }
+
 
         // Exports
         if (elements.exportCsvBtn) {
@@ -378,37 +417,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function launchPersonaScan() {
-        if (!activePersonaUrl && !activeInquiryId) {
-            showNotification('No active Persona Face Scan inquiry found.', 'error');
+        if (!activePersonaUrl) {
+            showNotification('No active Face Verification URL. Please click Log In first.', 'error');
             return;
         }
 
-        if (window.Persona && activeInquiryId) {
-            try {
-                const client = new Persona.Client({
-                    inquiryId: activeInquiryId,
-                    onComplete: ({ inquiryId, status, fields }) => {
-                        showNotification('Face Scan Complete! Validating session...', 'success');
-                        setTimeout(checkAuthStatus, 2000);
-                    },
-                    onCancel: () => showNotification('Face Scan cancelled.', 'info'),
-                    onError: (error) => console.log('Persona SDK Error:', error)
-                });
-                client.open();
-                return;
-            } catch (e) {
-                console.log('Persona SDK launch fallback to Popup window');
+        // Open directly in new tab — this gives full camera access (HTTPS + no popup restrictions)
+        const newTab = window.open(activePersonaUrl, '_blank');
+        if (newTab) {
+            newTab.focus();
+            showNotification('Face scan opened in new tab. Complete face login there, then come back and click "Verify Completed Face Scan".', 'info');
+
+            // Start polling for auth completion in background
+            startPersonaPolling();
+        } else {
+            // If popups blocked, instruct user to open manually
+            showNotification('Could not open tab. Click the link to open face scan manually.', 'warning');
+
+            // Show a copy-link helper
+            const personaContainer = document.getElementById('personaContainer');
+            if (personaContainer) {
+                const linkDiv = document.createElement('div');
+                linkDiv.style.cssText = 'margin-top:10px; padding: 8px; background: rgba(0,242,254,0.1); border-radius: 6px; word-break: break-all; font-size: 0.75rem;';
+                linkDiv.innerHTML = `<a href="${activePersonaUrl}" target="_blank" style="color:#38bdf8; text-decoration: underline;">Click here to open Face Scan →</a>`;
+                // Remove old link if exists
+                const oldLink = personaContainer.querySelector('.persona-link');
+                if (oldLink) oldLink.remove();
+                linkDiv.className = 'persona-link';
+                personaContainer.querySelector('.text-center').appendChild(linkDiv);
             }
         }
-
-        // Popup Window Fallback
-        const popup = window.open(activePersonaUrl, 'WorldQuantPersonaAuth', 'width=650,height=750,scrollbars=yes,resizable=yes');
-        if (popup) {
-            showNotification('Opened Face Scan in secure window. Complete face login, then click "Verify Completed Face Scan".', 'info');
-        } else {
-            showNotification('Popup blocked! Please allow popups or open platform.worldquantbrain.com directly.', 'error');
-        }
     }
+
+    let personaPollTimer = null;
+
+    function startPersonaPolling() {
+        if (personaPollTimer) clearInterval(personaPollTimer);
+        let attempts = 0;
+        const maxAttempts = 30; // poll for 2 minutes max
+
+        personaPollTimer = setInterval(async () => {
+            attempts++;
+            try {
+                const resp = await fetch('/api/auth/status');
+                const data = await resp.json();
+                if (data.authenticated) {
+                    clearInterval(personaPollTimer);
+                    personaPollTimer = null;
+                    showNotification(`Face login verified! Authenticated as ${data.user_email}`, 'success');
+                    
+                    // Hide persona container and close modal
+                    const personaContainer = document.getElementById('personaContainer');
+                    if (personaContainer) personaContainer.style.display = 'none';
+                    elements.cookieModal.classList.remove('active');
+                    checkAuthStatus();
+                }
+            } catch(e) {
+                // ignore polling errors
+            }
+
+            if (attempts >= maxAttempts) {
+                clearInterval(personaPollTimer);
+                personaPollTimer = null;
+            }
+        }, 4000); // check every 4 seconds
+    }
+
 
     async function handleBiometricAuth() {
         if (!window.PublicKeyCredential) {

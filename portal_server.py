@@ -29,8 +29,8 @@ RESULTS_CSV = os.path.join(WORKSPACE_DIR, "simulation_results.csv")
 ELITE_FILE = os.path.join(WORKSPACE_DIR, "elite_alphas.txt")
 AUTH_FILE = os.path.join(WORKSPACE_DIR, "auth_credentials.json")
 
-# Default User Cookie from alpha_factory
-DEFAULT_COOKIE = "_fbp=fb.1.1778595947954.838983336151760867; _ga=GA1.1.687920460.1778595944; _ga_9RN6WVT1K1=GS2.1.s1781261144$o102$g1$t1781261272$j59$l0$h0; _rdt_uuid=1778595944372.55b2243d-1bc9-440f-a27d-c17c7e25a64c; t=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJnazFBcmtJOTJuN3RDUFQ2Vk9NU0FwMDgwTkxGYXNERiIsImV4cCI6MTc4MTI3NTY1MiwiYW1yIjpbInB3ZCIsImZhY2UiLCJjYXB0Y2hhIl19.BnWNMKcA2HPmJvAizMg9APzXLFHJAMfbkhiwDtmevGg; _gcl_au=1.1.326319197.1778595941.1284668449.1781175694.1781175694; _ga_FXKNEPLB1N=GS2.1.s1779733566$o7$g0$t1779733566$j60$l0$h0; __zlcmid=1XcoWMCkz0Gybrj; cookieyes-consent=consentid:V3N1Q1lGeXMxZWJjQU5ienR2TEtiUnlGMTdIN3k3cFA,consent:yes,action:yes,necessary:yes,functional:yes,analytics:yes,performance:yes,advertisement:yes,other:yes"
+# Default JWT — updated 2026-09-12. Replace when expired.
+DEFAULT_COOKIE = "t=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI1ekRNdU1WTnQ2WmZlZUZjOXRKMjNTVTFycnZsUTFhWSIsImV4cCI6MTc4OTIyNzQxOCwiYW1yIjpbInB3ZCIsImZhY2UiLCJjYXB0Y2hhIl19.E4zgwOfiLMshfDgDVvU_hraYo8yhjJ7CaTYI_qTkWzc"
 
 # Global Auth State
 auth_state = {
@@ -39,6 +39,7 @@ auth_state = {
     "authenticated": False,
     "last_checked": None
 }
+
 
 def load_auth_credentials():
     if os.path.exists(AUTH_FILE):

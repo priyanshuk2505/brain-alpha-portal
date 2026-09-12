@@ -272,6 +272,12 @@ def check_auth_status():
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
             save_auth_credentials()
             return True, auth_state["user_email"]
+        elif resp.status_code == 401 and auth_state.get("saved_email") and auth_state.get("saved_password"):
+            print(f"[AUTH] Session expired (HTTP 401). Auto-refreshing using saved credentials for {auth_state['saved_email']}...")
+            ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
+            if ok:
+                return True, auth_state["user_email"]
+            return False, f"Auto-refresh failed: {msg}"
         else:
             auth_state["authenticated"] = False
             return False, f"HTTP {resp.status_code} — session may be expired. Please re-login."

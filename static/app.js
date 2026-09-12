@@ -573,15 +573,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let expressions = [];
-        if (rawInput.startsWith('[')) {
+        let cleaned = rawInput.trim();
+        if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
+        }
+        if (cleaned.startsWith('[')) {
             try {
-                expressions = JSON.parse(rawInput);
+                const parsed = JSON.parse(cleaned);
+                if (Array.isArray(parsed)) {
+                    expressions = parsed.map(item => String(item).trim()).filter(Boolean);
+                }
             } catch (e) {
-                expressions = rawInput.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
+                expressions = cleaned.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
             }
         } else {
-            expressions = rawInput.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
+            expressions = cleaned.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
         }
+
+        // Clean wrapping quotes or leading/trailing commas from expressions
+        expressions = expressions.map(expr => {
+            let s = expr.trim();
+            while (s.length > 1 && ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")) || s.startsWith(',') || s.endsWith(','))) {
+                if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+                    s = s.slice(1, -1).trim();
+                } else if (s.startsWith(',')) {
+                    s = s.slice(1).trim();
+                } else if (s.endsWith(',')) {
+                    s = s.slice(0, -1).trim();
+                }
+            }
+            return s;
+        }).filter(Boolean);
 
         if (expressions.length === 0) {
             showNotification('No valid alpha expressions parsed.', 'warning');
@@ -618,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await resp.json();
             if (resp.ok && data.batch_id) {
-                showNotification(`Launched batch ${data.batch_id} with ${data.total_expressions} alphas!`, 'success');
+                showNotification(`Launched batch ${data.batch_id} with ${data.total_enqueued} alphas!`, 'success');
                 fetchQueueAndResults();
             } else {
                 showNotification(`Launch Error: ${data.error || 'Failed to submit batch'}`, 'error');

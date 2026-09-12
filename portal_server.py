@@ -341,10 +341,12 @@ def _poll_simulation(session, status_url, alpha_hash, universe, decay):
                 poll_count += 1
                 continue
 
-            # Check status field
+            # Check status field & progress
             status = data.get("status", "")
-            if status in ["COMPLETE", "WARNING"]:
-                alpha_id = data.get("alpha")
+            progress = data.get("progress", 0)
+            alpha_id = data.get("alpha")
+
+            if status in ["COMPLETE", "WARNING"] or progress == 1.0 or (alpha_id and isinstance(alpha_id, str) and progress == 0 and not status):
                 failed_checks = []
                 metrics = None
 
@@ -714,6 +716,22 @@ def login_auth():
         "persona_url": persona_url
     })
 
+def clean_single_expression(expr_str):
+    if not expr_str:
+        return ""
+    s = str(expr_str).strip()
+    if s.startswith("```"):
+        s = re.sub(r"^```(?:json)?", "", s).rstrip("`").strip()
+    # Strip wrapping quotes or trailing/leading commas
+    while len(s) > 1 and ((s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")) or s.startswith(",") or s.endswith(",")):
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            s = s[1:-1].strip()
+        elif s.startswith(","):
+            s = s[1:].strip()
+        elif s.endswith(","):
+            s = s[:-1].strip()
+    return s
+
 @app.route("/api/simulations/batch", methods=["POST"])
 def enqueue_batch():
     data = request.get_json() or {}
@@ -722,11 +740,29 @@ def enqueue_batch():
     dry_run = data.get("dry_run", False) or settings.get("dry_run", False)
     auto_submit = data.get("auto_submit", False) or settings.get("auto_submit", False)
     
+    expressions = []
     if isinstance(raw_expressions, str):
-        # Line-separated expressions
-        expressions = [line.strip() for line in raw_expressions.splitlines() if line.strip() and not line.strip().startswith("#")]
+        raw_str = raw_expressions.strip()
+        if raw_str.startswith("```"):
+            raw_str = re.sub(r"^```(?:json)?", "", raw_str).rstrip("`").strip()
+        if raw_str.startswith("["):
+            try:
+                parsed = json.loads(raw_str)
+                if isinstance(parsed, list):
+                    raw_expressions = parsed
+            except Exception:
+                pass
+    
+    if isinstance(raw_expressions, list):
+        for item in raw_expressions:
+            c = clean_single_expression(item)
+            if c:
+                expressions.append(c)
     else:
-        expressions = [str(e).strip() for e in raw_expressions if str(e).strip()]
+        for line in str(raw_expressions).splitlines():
+            c = clean_single_expression(line)
+            if c and not c.startswith("#"):
+                expressions.append(c)
         
     if not expressions:
         return jsonify({"error": "No valid expressions provided"}), 400
@@ -912,10 +948,10 @@ def get_alpha_pnl(alpha_id):
             records.append([d, round(cumulative, 2)])
         return jsonify({"status": "SUCCESS", "alpha_id": alpha_id, "pnl": records})
         
-    session, headers = get_brain_session()
+    session = get_brain_session()
     url = f"https://api.worldquantbrain.com/alphas/{alpha_id}/recordsets/pnl"
     try:
-        resp = session.get(url, headers=headers, timeout=10)
+        resp = session.get(url, timeout=10)
         if resp.status_code == 200:
             return jsonify(resp.json())
         return jsonify({"error": f"BRAIN API HTTP {resp.status_code}", "text": resp.text}), resp.status_code

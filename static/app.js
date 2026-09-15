@@ -1,1204 +1,1160 @@
 /**
- * WorldQuant BRAIN Batch Alpha Portal - Application Logic
- * Modern SPA controller for batch alpha simulations, job queue monitoring,
- * compound multi-filtering, expanded settings options, expandable row details,
- * Chart.js PnL visualization, WebAuthn Biometric & Email/Password authentication,
- * and live batch progress tracking.
+ * WorldQuant BRAIN Alpha Portal — v2 Application
+ * Full auth state machine, 8-slot queue dashboard, pass/fail matrix,
+ * results explorer with filtering/sorting, PnL chart modal.
  */
+'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // -------------------------------------------------------------------------
-    // Global State
-    // -------------------------------------------------------------------------
-    let currentResults = [];
-    let currentBatches = [];
-    let pnlChartInstance = null;
-    let sortColumn = 'sharpe';
-    let sortAscending = false;
-    let pollTimer = null;
-    let isEliteOnlyFilter = false;
-    let expandedRowHashes = new Set();
 
-    // -------------------------------------------------------------------------
-    // DOM Elements
-    // -------------------------------------------------------------------------
-    const elements = {
-        // Auth
-        authStatusBadge: document.getElementById('authStatusBadge'),
-        openCookieModalBtn: document.getElementById('openCookieModalBtn'),
-        cookieModal: document.getElementById('cookieModal'),
-        cookieInput: document.getElementById('cookieInput'),
-        saveCookieBtn: document.getElementById('saveCookieBtn'),
+  // ═══════════════════════════════════════════════════ STATE ═══════════
 
-        // Auth Tabs & Inputs
-        loginEmailInput: document.getElementById('loginEmailInput'),
-        loginPasswordInput: document.getElementById('loginPasswordInput'),
-        loginBrainBtn: document.getElementById('loginBrainBtn'),
-        biometricAuthBtn: document.getElementById('biometricAuthBtn'),
+  const state = {
+    authenticated: false,
+    userEmail: '',
+    personaUrl: null,
+    currentBatch: null,
+    results: [],
+    slots: [],
+    sortCol: 'sharpe',
+    sortAsc: false,
+    eliteOnly: false,
+    expandedRows: new Set(),
+    pnlChart: null,
+    pollInterval: null,
+    slotElapsedTimers: {},
+    lastRateLimit: {},
+    batchItems: [],          // flat list of items from active batch for matrix
+    batchUniverses: new Set()
+  };
 
-        // Tabs
-        tabBtns: document.querySelectorAll('.tab-btn'),
-        tabContents: document.querySelectorAll('.tab-content'),
+  // ═══════════════════════════════════════════════════ PRESETS ══════════
 
-        // Form Inputs
-        batchInput: document.getElementById('batchInput'),
-        presetSelect: document.getElementById('presetSelect'),
-        applyPresetBtn: document.getElementById('applyPresetBtn'),
-        fileDropzone: document.getElementById('fileDropzone'),
-        fileInput: document.getElementById('fileInput'),
+  const PRESETS = {
+    momentum: [
+      "normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(returns), 3)) * rank(ts_delta(rank(volume), 3))), market)), 3))",
+      "normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(vwap), 5)) * rank(ts_delta(rank(adv20), 5))), market)), 2))",
+      "normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_delta(close, 5)) * rank(adv20), sector)), 5))"
+    ],
+    reversion: [
+      "normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(implied_volatility_mean_skew_10, 3)) - rank(ts_delta(implied_volatility_mean_skew_10, 10))), market)), 2))",
+      "normalize(ts_decay_linear(zscore(group_neutralize(-rank(ts_delta(close, 1)) * rank(adv20), industry)), 3))"
+    ],
+    volatility: [
+      "normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(returns), 3)) * rank(parkinson_volatility_10)), market)), 3))",
+      "normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_mean(volume/adv20, 10)), sector)), 5))"
+    ],
+    liquidity: [
+      "normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1) - rank(adv20))) * rank(adv20)), market)), 5))",
+      "normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20)), industry)), 3))"
+    ]
+  };
 
-        // Settings
-        settingUniverse: document.getElementById('settingUniverse'),
-        settingNeutralization: document.getElementById('settingNeutralization'),
-        settingLanguage: document.getElementById('settingLanguage'),
-        settingDelay: document.getElementById('settingDelay'),
-        settingDecay: document.getElementById('settingDecay'),
-        settingRegion: document.getElementById('settingRegion'),
-        settingTruncation: document.getElementById('settingTruncation'),
-        settingPasteurization: document.getElementById('settingPasteurization'),
-        settingNanHandling: document.getElementById('settingNanHandling'),
-        settingUnitHandling: document.getElementById('settingUnitHandling'),
-        settingDryRun: document.getElementById('settingDryRun'),
-        settingAutoSubmit: document.getElementById('settingAutoSubmit'),
+  // ═══════════════════════════════════════════════════ INIT ═════════════
 
-        // Actions
-        launchBatchBtn: document.getElementById('launchBatchBtn'),
-        clearInputBtn: document.getElementById('clearInputBtn'),
+  function init() {
+    buildSlotGrid();
+    bindLoginEvents();
+    bindMainEvents();
+    loadDefaultSettings();
+    checkAuthOnLoad();
+  }
 
-        // Active Queue
-        queueStatsBadge: document.getElementById('queueStatsBadge'),
-        activeQueueContainer: document.getElementById('activeQueueContainer'),
+  // ═══════════════════════════════════════════════════ LOGIN ════════════
 
-        // Results Explorer Filters & Controls
-        resultsCountBadge: document.getElementById('resultsCountBadge'),
-        searchInput: document.getElementById('searchInput'),
-        filterStatus: document.getElementById('filterStatus'),
-        filterUniverse: document.getElementById('filterUniverse'),
-        filterNeutralization: document.getElementById('filterNeutralization'),
-        filterSharpe: document.getElementById('filterSharpe'),
-        toggleEliteBtn: document.getElementById('toggleEliteBtn'),
-        exportCsvBtn: document.getElementById('exportCsvBtn'),
-        exportEliteBtn: document.getElementById('exportEliteBtn'),
-        resultsTableBody: document.getElementById('resultsTableBody'),
+  function bindLoginEvents() {
+    // Show/hide cookie paste area
+    document.getElementById('loginCookieToggle').addEventListener('click', () => {
+      const area = document.getElementById('cookiePasteArea');
+      area.style.display = area.style.display === 'none' ? 'block' : 'none';
+    });
 
-        // PnL Modal
-        pnlModal: document.getElementById('pnlModal'),
-        modalAlphaTitle: document.getElementById('modalAlphaTitle'),
-        pnlChartCanvas: document.getElementById('pnlChartCanvas'),
-        modalAlphaDetails: document.getElementById('modalAlphaDetails'),
+    // Password visibility toggle
+    document.getElementById('passToggle').addEventListener('click', () => {
+      const inp = document.getElementById('loginPassword');
+      const ico = document.getElementById('passToggle').querySelector('i');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        ico.className = 'fa-solid fa-eye-slash';
+      } else {
+        inp.type = 'password';
+        ico.className = 'fa-solid fa-eye';
+      }
+    });
 
-        // Modals close buttons
-        closeModalBtns: document.querySelectorAll('.close-modal')
+    // Login button
+    document.getElementById('loginBtn').addEventListener('click', handleLogin);
+    document.getElementById('loginPassword').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+
+    // Cookie save
+    document.getElementById('cookieSaveBtn').addEventListener('click', handleCookieSave);
+
+    // Face ID flow
+    document.getElementById('openFaceScanBtn').addEventListener('click', () => {
+      if (!state.personaUrl && !state.inquiryId) { toast('No face scan URL. Click Sign In first.', 'error'); return; }
+      const targetUrl = state.inquiryId
+        ? `https://api.worldquantbrain.com/authentication/persona?inquiry=${state.inquiryId}`
+        : state.personaUrl;
+      window.open(targetUrl, '_blank');
+      toast('Face scan opened. Complete it, then click "Done — Verify Session".', 'info');
+      pollPersonaAuth();
+    });
+
+    document.getElementById('verifyFaceBtn').addEventListener('click', async () => {
+      await performPersonaVerification();
+    });
+
+    document.getElementById('backToLoginBtn').addEventListener('click', () => {
+      showLoginStep('loginStepCredentials');
+    });
+  }
+
+  async function performPersonaVerification() {
+    const btn = document.getElementById('verifyFaceBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
+    }
+
+    try {
+      const resp = await fetch('/api/auth/complete-persona', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona_url: state.personaUrl })
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        toast(`Face scan verified! Authenticated as ${data.user_email}`, 'success');
+        state.authenticated = true;
+        state.userEmail = data.user_email;
+        enterMainApp();
+      } else {
+        const statusEl = document.getElementById('faceVerifyStatus');
+        if (statusEl) {
+          statusEl.textContent = data.message || 'Verification failed. Complete the face scan first.';
+          statusEl.style.display = 'block';
+          statusEl.style.background = 'rgba(255,77,109,0.1)';
+          statusEl.style.color = 'var(--accent-red)';
+        }
+        toast(data.message || 'Face scan not yet complete. Try again.', 'warning');
+      }
+    } catch (e) {
+      toast('Server error during verification.', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Done — Verify Session';
+      }
+    }
+  }
+
+  function launchEmbeddedPersona(inquiryId) {
+    if (window.Persona && window.Persona.Client) {
+      try {
+        toast('Launching Face Scan inline modal...', 'info');
+        const client = new Persona.Client({
+          inquiryId: inquiryId,
+          onComplete: async ({ inquiryId, status, fields }) => {
+            toast('Face scan complete! Finalizing session with BRAIN API...', 'info');
+            await performPersonaVerification();
+          },
+          onCancel: ({ inquiryId, sessionToken }) => {
+            toast('Face scan cancelled.', 'warning');
+            showLoginStep('loginStepFaceId');
+          },
+          onError: (error) => {
+            console.error('Persona SDK error:', error);
+            showLoginStep('loginStepFaceId');
+          }
+        });
+        client.open();
+        return true;
+      } catch (err) {
+        console.warn('Embedded Persona failed to open:', err);
+      }
+    }
+    return false;
+  }
+
+  async function handleLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    const errEl = document.getElementById('loginError');
+
+    if (!email || !password) {
+      errEl.textContent = 'Please enter both email and password.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+    setLoginBtnLoading(true);
+
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        toast(`Authenticated as ${data.user_email}!`, 'success');
+        state.authenticated = true;
+        state.userEmail = data.user_email;
+        enterMainApp();
+      } else if (data.requires_persona) {
+        state.personaUrl = data.persona_url;
+        state.inquiryId = data.inquiry_id;
+
+        // Try launching inline embedded Persona face scan modal first!
+        const launched = data.inquiry_id && launchEmbeddedPersona(data.inquiry_id);
+        if (!launched) {
+          showLoginStep('loginStepFaceId');
+          const statusEl = document.getElementById('faceVerifyStatus');
+          if (statusEl) {
+            statusEl.textContent = 'Face scan URL ready. Open and complete it.';
+            statusEl.style.display = 'block';
+          }
+        }
+      } else {
+        errEl.textContent = data.message || 'Authentication failed.';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      errEl.textContent = 'Server connection error. Is the portal running?';
+      errEl.style.display = 'block';
+    } finally {
+      setLoginBtnLoading(false);
+    }
+  }
+
+  async function handleCookieSave() {
+    const cookie = document.getElementById('cookiePasteInput').value.trim();
+    if (!cookie) { toast('Please paste a cookie or JWT token.', 'warning'); return; }
+
+    try {
+      const resp = await fetch('/api/auth/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookie })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        toast(`Session valid: ${data.user_email}`, 'success');
+        state.authenticated = true;
+        state.userEmail = data.user_email;
+        enterMainApp();
+      } else {
+        toast(`Cookie invalid: ${data.details || 'Unknown error'}`, 'error');
+      }
+    } catch (e) {
+      toast('Error saving cookie.', 'error');
+    }
+  }
+
+  function pollPersonaAuth() {
+    // Poll the complete-persona endpoint every 5s — it checks if BRAIN accepted the face scan
+    let attempts = 0;
+    const maxAttempts = 36; // poll for 3 minutes max
+    const interval = setInterval(async () => {
+      attempts++;
+      try {
+        const resp = await fetch('/api/auth/complete-persona', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona_url: state.personaUrl })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          clearInterval(interval);
+          toast(`Face login verified! Authenticated as ${data.user_email}`, 'success');
+          state.authenticated = true;
+          state.userEmail = data.user_email;
+          enterMainApp();
+        }
+        // If not yet complete, keep polling silently
+      } catch (_) {}
+      if (attempts >= maxAttempts) clearInterval(interval);
+    }, 5000);
+  }
+
+  async function checkAuthOnLoad() {
+    try {
+      const resp = await fetch('/api/auth/status');
+      const data = await resp.json();
+      if (data.authenticated) {
+        state.authenticated = true;
+        state.userEmail = data.user_email;
+        if (data.rate_limit) state.lastRateLimit = data.rate_limit;
+        enterMainApp();
+      } else if (data.details && data.details.startsWith('FACE_REQUIRED:')) {
+        // JWT expired, auto-refresh tried, but needs face scan
+        // Pre-fill persona URL and show face scan step automatically
+        state.personaUrl = data.details.replace('FACE_REQUIRED:', '');
+        showLoginStep('loginStepFaceId');
+        const statusEl = document.getElementById('faceVerifyStatus');
+        statusEl.textContent = 'Your session expired. Complete face scan to re-authenticate automatically.';
+        statusEl.style.display = 'block';
+        toast('Session expired — complete face scan to continue.', 'warning');
+        pollPersonaAuth();
+      }
+      // else: stay on login screen
+    } catch (_) {}
+  }
+
+  async function checkAuthAndProceed() {
+    try {
+      const resp = await fetch('/api/auth/status');
+      const data = await resp.json();
+      if (data.authenticated) {
+        toast(`Authenticated as ${data.user_email}`, 'success');
+        state.authenticated = true;
+        state.userEmail = data.user_email;
+        enterMainApp();
+      } else if (data.details && data.details.startsWith('FACE_REQUIRED:')) {
+        state.personaUrl = data.details.replace('FACE_REQUIRED:', '');
+        showLoginStep('loginStepFaceId');
+        toast('Face scan required. Open the scan and complete it.', 'warning');
+        pollPersonaAuth();
+      } else {
+        toast('Session not yet verified. Complete the face scan first.', 'warning');
+      }
+    } catch (_) {
+      toast('Error checking auth.', 'error');
+    }
+  }
+
+  function enterMainApp() {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+    updateAuthBadge(true, state.userEmail);
+    startPolling();
+    fetchResults();
+    fetchRateLimit();
+  }
+
+  function showLoginStep(stepId) {
+    document.querySelectorAll('.login-step').forEach(s => s.classList.remove('active'));
+    document.getElementById(stepId).classList.add('active');
+  }
+
+  function setLoginBtnLoading(loading) {
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = loading;
+    btn.querySelector('.btn-login-text').style.display = loading ? 'none' : 'inline-flex';
+    btn.querySelector('.btn-login-loading').style.display = loading ? 'inline-flex' : 'none';
+  }
+
+  // ═══════════════════════════════════════════════════ MAIN EVENTS ══════
+
+  function bindMainEvents() {
+    // Tab bar (alpha input)
+    document.querySelectorAll('.tab[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        document.querySelectorAll('.tab[data-tab]').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+      });
+    });
+
+    // Preset insert
+    document.getElementById('insertPresetBtn').addEventListener('click', () => {
+      const key = document.getElementById('presetSelect').value;
+      const exprs = PRESETS[key] || [];
+      const inp = document.getElementById('alphaInput');
+      const cur = inp.value.trim();
+      inp.value = cur ? cur + '\n' + exprs.join('\n') : exprs.join('\n');
+      updateExprCount();
+      // switch to editor tab
+      document.querySelector('.tab[data-tab="tabEditor"]').click();
+      toast(`Inserted ${exprs.length} preset expressions.`, 'success');
+    });
+
+    // File upload
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault(); dropzone.classList.remove('drag-over');
+      if (e.dataTransfer.files.length) handleFileUpload(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files.length) handleFileUpload(e.target.files[0]); });
+
+    // Count expressions on input
+    document.getElementById('alphaInput').addEventListener('input', updateExprCount);
+
+    // Clear editor
+    document.getElementById('clearEditorBtn').addEventListener('click', () => {
+      document.getElementById('alphaInput').value = '';
+      updateExprCount();
+    });
+
+    // Launch
+    document.getElementById('launchBtn').addEventListener('click', handleLaunch);
+
+    // Save defaults
+    document.getElementById('saveDefaultsBtn').addEventListener('click', saveDefaultSettings);
+
+    // Global cancel
+    document.getElementById('globalCancelBtn').addEventListener('click', handleGlobalCancel);
+
+    // Open session modal
+    document.getElementById('openSettingsCredBtn').addEventListener('click', () => {
+      showModal('sessionModal');
+    });
+    document.getElementById('sessionSaveBtn').addEventListener('click', async () => {
+      const cookie = document.getElementById('sessionCookieInput').value.trim();
+      if (!cookie) return;
+      const resp = await fetch('/api/auth/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookie })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        toast(`Session updated: ${data.user_email}`, 'success');
+        updateAuthBadge(true, data.user_email);
+        hideModal('sessionModal');
+      } else {
+        toast('Failed to validate cookie.', 'error');
+      }
+    });
+
+    // Modal close buttons
+    document.querySelectorAll('.modal-close[data-close]').forEach(btn => {
+      btn.addEventListener('click', () => hideModal(btn.getAttribute('data-close')));
+    });
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+      modal.addEventListener('click', e => {
+        if (e.target === modal) hideModal(modal.id);
+      });
+    });
+
+    // Filters
+    ['searchInput', 'filterStatus', 'filterUniverse', 'filterSharpe'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', renderResultsTable);
+    });
+
+    // Elite only toggle
+    document.getElementById('eliteOnlyBtn').addEventListener('click', () => {
+      state.eliteOnly = !state.eliteOnly;
+      document.getElementById('eliteOnlyBtn').classList.toggle('active', state.eliteOnly);
+      renderResultsTable();
+    });
+
+    // Sorting
+    document.querySelectorAll('#resultsTable th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.getAttribute('data-sort');
+        if (state.sortCol === col) { state.sortAsc = !state.sortAsc; }
+        else { state.sortCol = col; state.sortAsc = false; }
+        renderResultsTable();
+      });
+    });
+
+    // Exports
+    document.getElementById('exportCsvBtn').addEventListener('click', () => { window.location.href = '/api/export/csv'; });
+    document.getElementById('exportEliteBtn').addEventListener('click', () => { window.location.href = '/api/export/elite'; });
+  }
+
+  // ═══════════════════════════════════════════════════ FILE UPLOAD ══════
+
+  function handleFileUpload(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const lines = e.target.result.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+      if (!lines.length) { toast('No valid expressions in file.', 'warning'); return; }
+      const inp = document.getElementById('alphaInput');
+      const cur = inp.value.trim();
+      inp.value = cur ? cur + '\n' + lines.join('\n') : lines.join('\n');
+      updateExprCount();
+      document.querySelector('.tab[data-tab="tabEditor"]').click();
+      toast(`Loaded ${lines.length} expressions from ${file.name}`, 'success');
     };
+    reader.readAsText(file);
+  }
 
-    // -------------------------------------------------------------------------
-    // Preset Alpha Formulas
-    // -------------------------------------------------------------------------
-    const PRESETS = {
-        acceleration: [
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(rank(returns), 3)) * rank(delta(rank(volume), 3))), market)), 3))",
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(rank(vwap), 5)) * rank(delta(rank(volume), 5))), market)), 2))",
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(rank(close), 2)) * rank(delta(rank(adv20), 2))), market)), 5))"
-        ],
-        convergence: [
-            "normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1) - rank(adv20))) * rank(adv20)), market)), 5))",
-            "normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(snt_social_volume_fast_d1) - rank(adv20))) * rank(adv20)), market)), 3))",
-            "normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(implied_volatility_mean_skew_10) - rank(adv20))) * rank(adv20)), market)), 2))"
-        ],
-        volatility: [
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(rank(returns), 3)) * rank(parkinson_volatility_10)), market)), 3))",
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(rank(put_call_ratio_options), 5)) * rank(parkinson_volatility_10)), market)), 5))"
-        ],
-        reversion: [
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(implied_volatility_mean_skew_10, 3)) - rank(delta(implied_volatility_mean_skew_10, 10))), market)), 2))",
-            "normalize(ts_decay_linear(zscore(group_neutralize((rank(delta(analyst_revision_rank_derivative, 2)) - rank(delta(analyst_revision_rank_derivative, 5))), market)), 3))"
-        ]
+  function updateExprCount() {
+    const raw = document.getElementById('alphaInput').value;
+    const count = raw.split(/\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#')).length;
+    document.getElementById('exprCount').textContent = `${count} expression${count !== 1 ? 's' : ''}`;
+  }
+
+  // ═══════════════════════════════════════════════════ SETTINGS ═════════
+
+  const SETTING_IDS = ['sLang', 'sInstrument', 'sRegion', 'sDelay', 'sUniverse',
+    'sNeutralization', 'sDecay', 'sTruncation', 'sPasteurization', 'sUnitHandling',
+    'sNanHandling', 'sPeriodYears', 'sPeriodMonths', 'sMaxTrade', 'sMaxPosition',
+    'sDryRun', 'sAutoSubmit'];
+
+  function saveDefaultSettings() {
+    const settings = {};
+    SETTING_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      settings[id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    localStorage.setItem('brainPortalDefaults_v2', JSON.stringify(settings));
+    toast('Settings saved as default.', 'success');
+  }
+
+  function loadDefaultSettings() {
+    try {
+      const saved = localStorage.getItem('brainPortalDefaults_v2');
+      if (!saved) return;
+      const settings = JSON.parse(saved);
+      SETTING_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || !(id in settings)) return;
+        if (el.type === 'checkbox') el.checked = settings[id];
+        else el.value = settings[id];
+      });
+    } catch (_) {}
+  }
+
+  function getSettings() {
+    const years = parseInt(document.getElementById('sPeriodYears').value, 10) || 0;
+    const months = parseInt(document.getElementById('sPeriodMonths').value, 10) || 0;
+    const testPeriod = (years > 0 || months > 0) ? `P${years}Y${months}M` : '';
+    return {
+      language: document.getElementById('sLang').value,
+      instrumentType: document.getElementById('sInstrument').value,
+      region: document.getElementById('sRegion').value,
+      delay: parseInt(document.getElementById('sDelay').value, 10),
+      universe: document.getElementById('sUniverse').value,
+      neutralization: document.getElementById('sNeutralization').value,
+      decay: parseInt(document.getElementById('sDecay').value, 10) || 0,
+      truncation: parseFloat(document.getElementById('sTruncation').value) || 0.07,
+      pasteurization: document.getElementById('sPasteurization').value,
+      unitHandling: document.getElementById('sUnitHandling').value,
+      nanHandling: document.getElementById('sNanHandling').value,
+      testPeriod,
+      maxTrade: document.getElementById('sMaxTrade').value,
+      maxPosition: document.getElementById('sMaxPosition').value,
+      dry_run: document.getElementById('sDryRun').checked,
+      auto_submit: document.getElementById('sAutoSubmit').checked
     };
+  }
 
-    // -------------------------------------------------------------------------
-    // Initialization & Polling Setup
-    // -------------------------------------------------------------------------
-    function init() {
-        bindEvents();
-        checkAuthStatus();
-        fetchQueueAndResults();
+  // ═══════════════════════════════════════════════════ LAUNCH ═══════════
 
-        // Polling every 3 seconds for active queue progress and results updates
-        pollTimer = setInterval(fetchQueueAndResults, 3000);
+  async function handleLaunch() {
+    const rawInput = document.getElementById('alphaInput').value.trim();
+    if (!rawInput) { toast('Please enter at least one alpha expression.', 'warning'); return; }
+
+    let expressions = parseExpressions(rawInput);
+    if (!expressions.length) { toast('No valid expressions parsed.', 'warning'); return; }
+
+    const settings = getSettings();
+
+    // Track universes for matrix
+    state.batchUniverses = new Set([settings.universe]);
+    state.batchItems = expressions.map(expr => ({ expression: expr, universe: settings.universe, status: 'QUEUED', result: null }));
+
+    const btn = document.getElementById('launchBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Launching...';
+
+    try {
+      const resp = await fetch('/api/simulations/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expressions, settings })
+      });
+      const data = await resp.json();
+
+      if (resp.ok && data.batch_id) {
+        state.currentBatch = data.batch_id;
+        toast(`Batch ${data.batch_id} launched — ${data.total_enqueued} alphas queued!`, 'success');
+        showBatchProgress(0, data.total_enqueued);
+        document.getElementById('matrixCard').style.display = 'block';
+        renderMatrix();
+        startPolling();
+      } else {
+        toast(`Launch error: ${data.error || 'Unknown error'}`, 'error');
+      }
+    } catch (e) {
+      toast('Server error during launch.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-play"></i> Launch Simulation';
     }
+  }
 
-    // -------------------------------------------------------------------------
-    // Event Listeners
-    // -------------------------------------------------------------------------
-    function bindEvents() {
-        // Tab Switchers
-        elements.tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetTab = btn.getAttribute('data-tab');
-                const targetAuthTab = btn.getAttribute('data-authtab');
+  function parseExpressions(raw) {
+    let text = raw.trim();
+    if (text.startsWith('```')) text = text.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
+    let exprs = [];
+    if (text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) exprs = parsed.map(x => String(x).trim()).filter(Boolean);
+      } catch (_) {}
+    }
+    if (!exprs.length) {
+      exprs = text.split(/\n/).map(l => {
+        let s = l.trim();
+        while (s.length > 1 && ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")) || s.startsWith(',') || s.endsWith(','))) {
+          if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) s = s.slice(1,-1).trim();
+          else if (s.startsWith(',')) s = s.slice(1).trim();
+          else if (s.endsWith(',')) s = s.slice(0,-1).trim();
+        }
+        return s;
+      }).filter(s => s && !s.startsWith('#'));
+    }
+    return exprs;
+  }
 
-                if (targetTab) {
-                    elements.tabBtns.forEach(b => { if (b.getAttribute('data-tab')) b.classList.remove('active'); });
-                    elements.tabContents.forEach(c => c.classList.remove('active'));
-                    btn.classList.add('active');
-                    document.getElementById(targetTab).classList.add('active');
-                } else if (targetAuthTab) {
-                    document.querySelectorAll('[data-authtab]').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.auth-tab-content').forEach(c => c.classList.remove('active'));
-                    btn.classList.add('active');
-                    document.getElementById(targetAuthTab).classList.add('active');
-                }
-            });
+  // ═══════════════════════════════════════════════════ GLOBAL CANCEL ════
+
+  async function handleGlobalCancel() {
+    if (!confirm('Cancel all running and queued simulations?')) return;
+    try {
+      const resp = await fetch('/api/simulations/cancel', { method: 'POST' });
+      const data = await resp.json();
+      toast(data.message || 'All simulations cancelled.', 'warning');
+      fetchQueueAndSlots();
+    } catch (e) {
+      toast('Error cancelling.', 'error');
+    }
+  }
+
+  async function cancelSingleSlot(batchId, itemIndex) {
+    try {
+      const resp = await fetch('/api/simulations/cancel/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId, item_index: itemIndex })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        toast(`Simulation slot cancelled.`, 'warning');
+      } else {
+        toast(data.error || 'Cannot cancel this slot.', 'error');
+      }
+    } catch (e) {
+      toast('Error cancelling slot.', 'error');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════ POLLING ══════════
+
+  function startPolling() {
+    if (state.pollInterval) clearInterval(state.pollInterval);
+    state.pollInterval = setInterval(fetchQueueAndSlots, 2500);
+  }
+
+  async function fetchQueueAndSlots() {
+    try {
+      const [slotsResp, batchesResp] = await Promise.all([
+        fetch('/api/simulations/slots'),
+        fetch('/api/simulations/batches')
+      ]);
+
+      if (slotsResp.ok) {
+        state.slots = await slotsResp.json();
+        renderSlots();
+      }
+
+      if (batchesResp.ok) {
+        const batches = await batchesResp.json();
+        const activeBatch = state.currentBatch
+          ? batches.find(b => b.batch_id === state.currentBatch)
+          : batches.find(b => b.status === 'RUNNING');
+
+        if (activeBatch) {
+          showBatchProgress(activeBatch.progress, activeBatch.total, activeBatch.completed);
+          updateQueueBadge(activeBatch);
+
+          if (activeBatch.status === 'COMPLETED' || activeBatch.status === 'CANCELLED') {
+            fetchResults();
+            fetchBatchDetails(activeBatch.batch_id);
+          }
+        } else if (batches.length === 0 || batches.every(b => !['RUNNING','PENDING'].includes(b.status))) {
+          hideBatchProgress();
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function fetchBatchDetails(batchId) {
+    try {
+      const resp = await fetch(`/api/simulations/batch/${batchId}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.items) {
+        // Update state.batchItems for matrix
+        data.items.forEach((item, idx) => {
+          if (state.batchItems[idx]) {
+            state.batchItems[idx].status = item.status;
+            state.batchItems[idx].result = item.result;
+          }
         });
+        renderMatrix();
+      }
+    } catch (_) {}
+  }
 
-        // Apply Preset
-        if (elements.applyPresetBtn) {
-            elements.applyPresetBtn.addEventListener('click', () => {
-                const selectedKey = elements.presetSelect.value;
-                const formulas = PRESETS[selectedKey] || [];
-                const currentText = elements.batchInput.value.trim();
-                const newText = formulas.join('\n');
-                elements.batchInput.value = currentText ? `${currentText}\n${newText}` : newText;
-                showNotification(`Inserted ${formulas.length} preset expressions!`, 'success');
-            });
+  async function fetchResults() {
+    try {
+      const resp = await fetch('/api/results');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      state.results = Array.isArray(data) ? data : [];
+      renderResultsTable();
+    } catch (_) {}
+  }
+
+  async function fetchRateLimit() {
+    try {
+      const resp = await fetch('/api/simulations/ratelimit');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      state.lastRateLimit = data;
+      updateRateLimitDisplay(data);
+    } catch (_) {}
+  }
+
+  // ═══════════════════════════════════════════════════ SLOT GRID ════════
+
+  function buildSlotGrid() {
+    const grid = document.getElementById('slotGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 8; i++) {
+      const card = document.createElement('div');
+      card.className = 'slot-card idle';
+      card.id = `slot-card-${i}`;
+      card.innerHTML = `
+        <button class="slot-cancel-btn" id="slot-cancel-${i}" title="Cancel this simulation">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="slot-num">SLOT ${i + 1}</div>
+        <div class="slot-status-icon" id="slot-icon-${i}">
+          <i class="fa-solid fa-circle"></i>
+        </div>
+        <div class="slot-expr" id="slot-expr-${i}">idle</div>
+        <div class="slot-elapsed" id="slot-elapsed-${i}"></div>
+      `;
+      grid.appendChild(card);
+
+      document.getElementById(`slot-cancel-${i}`).addEventListener('click', () => {
+        const slotData = state.slots[i];
+        if (slotData && slotData.batch_id !== null && slotData.item_index !== null) {
+          cancelSingleSlot(slotData.batch_id, slotData.item_index);
         }
+      });
+    }
+  }
 
-        // File Dropzone & Upload
-        if (elements.fileDropzone && elements.fileInput) {
-            elements.fileDropzone.addEventListener('click', () => elements.fileInput.click());
-            
-            elements.fileDropzone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                elements.fileDropzone.classList.add('drag-over');
-            });
+  function renderSlots() {
+    const slots = state.slots;
+    for (let i = 0; i < 8; i++) {
+      const slotData = slots[i] || { status: 'IDLE', expression: null, start_time: null };
+      const card = document.getElementById(`slot-card-${i}`);
+      const iconEl = document.getElementById(`slot-icon-${i}`);
+      const exprEl = document.getElementById(`slot-expr-${i}`);
+      const elapsedEl = document.getElementById(`slot-elapsed-${i}`);
 
-            elements.fileDropzone.addEventListener('dragleave', () => {
-                elements.fileDropzone.classList.remove('drag-over');
-            });
+      if (!card) continue;
 
-            elements.fileDropzone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                elements.fileDropzone.classList.remove('drag-over');
-                if (e.dataTransfer.files.length > 0) {
-                    handleFileUpload(e.dataTransfer.files[0]);
-                }
-            });
+      const isActive = slotData.status === 'SIMULATING';
 
-            elements.fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFileUpload(e.target.files[0]);
-                }
-            });
+      card.className = `slot-card ${isActive ? 'simulating' : 'idle'}`;
+
+      if (isActive) {
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+        const expr = slotData.expression || '';
+        exprEl.textContent = expr.length > 24 ? expr.substring(0, 24) + '…' : expr;
+        exprEl.title = expr;
+
+        // Elapsed timer
+        if (slotData.start_time) {
+          const started = new Date(slotData.start_time).getTime();
+          if (!state.slotElapsedTimers[i]) {
+            state.slotElapsedTimers[i] = setInterval(() => {
+              const sec = Math.floor((Date.now() - started) / 1000);
+              const el = document.getElementById(`slot-elapsed-${i}`);
+              if (el) el.textContent = `${sec}s`;
+            }, 1000);
+          }
         }
-
-        // Launch Batch Simulation Button
-        if (elements.launchBatchBtn) {
-            elements.launchBatchBtn.addEventListener('click', handleLaunchBatch);
+      } else {
+        iconEl.innerHTML = '<i class="fa-solid fa-circle"></i>';
+        exprEl.textContent = 'idle';
+        elapsedEl.textContent = '';
+        if (state.slotElapsedTimers[i]) {
+          clearInterval(state.slotElapsedTimers[i]);
+          delete state.slotElapsedTimers[i];
         }
-
-        // Clear Input
-        if (elements.clearInputBtn) {
-            elements.clearInputBtn.addEventListener('click', () => {
-                elements.batchInput.value = '';
-                showNotification('Editor cleared.', 'info');
-            });
-        }
-
-        // Cancel Batch Simulation Button
-        const cancelBtn = document.getElementById('cancelBatchBtn');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', async () => {
-                try {
-                    const resp = await fetch('/api/simulations/cancel', { method: 'POST' });
-                    const data = await resp.json();
-                    if (data.success) {
-                        showNotification('Batch simulation cancelled and queue stopped.', 'warning');
-                        fetchQueueAndResults();
-                    }
-                } catch (e) {
-                    showNotification('Error cancelling batch.', 'error');
-                }
-            });
-        }
-
-        // Search & Multi-Filter Event Listeners
-        if (elements.searchInput) elements.searchInput.addEventListener('input', renderResultsTable);
-        if (elements.filterStatus) elements.filterStatus.addEventListener('change', renderResultsTable);
-        if (elements.filterUniverse) elements.filterUniverse.addEventListener('change', renderResultsTable);
-        if (elements.filterNeutralization) elements.filterNeutralization.addEventListener('change', renderResultsTable);
-        if (elements.filterSharpe) elements.filterSharpe.addEventListener('change', renderResultsTable);
-
-        // Toggle Elite Alphas Only Button
-        if (elements.toggleEliteBtn) {
-            elements.toggleEliteBtn.addEventListener('click', () => {
-                isEliteOnlyFilter = !isEliteOnlyFilter;
-                if (isEliteOnlyFilter) {
-                    elements.toggleEliteBtn.classList.add('active');
-                    elements.toggleEliteBtn.innerHTML = `<i class="fa-solid fa-star text-gold"></i> Showing Elite Only`;
-                    showNotification('Filtered for Elite Alphas (Sharpe ≥ 1.25)', 'info');
-                } else {
-                    elements.toggleEliteBtn.classList.remove('active');
-                    elements.toggleEliteBtn.innerHTML = `<i class="fa-solid fa-star"></i> Elite Alphas Only`;
-                }
-                renderResultsTable();
-            });
-        }
-
-        // Sorting Headers
-        document.querySelectorAll('#resultsTable th[data-sort]').forEach(th => {
-            th.addEventListener('click', () => {
-                const col = th.getAttribute('data-sort');
-                if (sortColumn === col) {
-                    sortAscending = !sortAscending;
-                } else {
-                    sortColumn = col;
-                    sortAscending = false;
-                }
-                renderResultsTable();
-            });
-        });
-
-        // Modals
-        if (elements.openCookieModalBtn) {
-            elements.openCookieModalBtn.addEventListener('click', () => {
-                elements.cookieModal.classList.add('active');
-            });
-        }
-
-        elements.closeModalBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-            });
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.classList.remove('active');
-            }
-        });
-
-        // Save Credentials & Login Handlers
-        if (elements.saveCookieBtn) elements.saveCookieBtn.addEventListener('click', handleSaveCredentials);
-        if (elements.loginBrainBtn) elements.loginBrainBtn.addEventListener('click', handleEmailPasswordLogin);
-        if (elements.biometricAuthBtn) elements.biometricAuthBtn.addEventListener('click', handleBiometricAuth);
-
-        const launchPersonaBtn = document.getElementById('launchPersonaBtn');
-        if (launchPersonaBtn) launchPersonaBtn.addEventListener('click', launchPersonaScan);
-
-        const checkPersonaDoneBtn = document.getElementById('checkPersonaDoneBtn');
-        if (checkPersonaDoneBtn) {
-            checkPersonaDoneBtn.addEventListener('click', async () => {
-                const btn = checkPersonaDoneBtn;
-                btn.disabled = true;
-                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying...`;
-
-                // Re-attempt login with stored email/password after face scan
-                const email = elements.loginEmailInput.value.trim();
-                const password = elements.loginPasswordInput.value.trim();
-
-                if (email && password) {
-                    try {
-                        const resp = await fetch('/api/auth/login', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, password })
-                        });
-                        const data = await resp.json();
-
-                        if (data.success) {
-                            showNotification(`Face login verified! Authenticated as ${data.user_email}`, 'success');
-                            const personaContainer = document.getElementById('personaContainer');
-                            if (personaContainer) personaContainer.style.display = 'none';
-                            elements.cookieModal.classList.remove('active');
-                            checkAuthStatus();
-                        } else if (data.requires_persona) {
-                            showNotification('Face verification still pending. Please complete the face scan in the new tab first.', 'warning');
-                        } else {
-                            showNotification(`Session verified: ${data.message}`, 'info');
-                            await checkAuthStatus();
-                        }
-                    } catch(e) {
-                        showNotification('Could not verify. Checking auth status...', 'warning');
-                        await checkAuthStatus();
-                    }
-                } else {
-                    showNotification('Checking auth status with BRAIN...', 'info');
-                    await checkAuthStatus();
-                }
-
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Verify Completed Face Scan`;
-            });
-        }
-
-
-        // Exports
-        if (elements.exportCsvBtn) {
-            elements.exportCsvBtn.addEventListener('click', () => {
-                window.location.href = '/api/export/csv';
-            });
-        }
-
-        if (elements.exportEliteBtn) {
-            elements.exportEliteBtn.addEventListener('click', () => {
-                window.location.href = '/api/export/elite';
-            });
-        }
+      }
     }
 
-    // -------------------------------------------------------------------------
-    // Auth Status & Credentials Update Handlers
-    // -------------------------------------------------------------------------
-    async function checkAuthStatus() {
-        try {
-            const resp = await fetch('/api/auth/status');
-            const data = await resp.json();
-            
-            if (data.authenticated) {
-                elements.authStatusBadge.className = 'status-pill status-success';
-                elements.authStatusBadge.innerHTML = `<span class="dot"></span><span class="status-label">Authenticated (${data.user_email || 'User'})</span>`;
-            } else {
-                elements.authStatusBadge.className = 'status-pill status-error';
-                elements.authStatusBadge.innerHTML = `<span class="dot"></span><span class="status-label">Unauthenticated / Expired</span>`;
-            }
-        } catch (e) {
-            elements.authStatusBadge.className = 'status-pill status-error';
-            elements.authStatusBadge.innerHTML = `<span class="dot"></span><span class="status-label">Server Connection Error</span>`;
+    // Update queue badge
+    const running = slots.filter(s => s && s.status === 'SIMULATING').length;
+    const badge = document.getElementById('queueBadge');
+    if (running > 0) {
+      badge.className = 'badge-pill badge-orange';
+      badge.textContent = `${running}/8 running`;
+    } else {
+      badge.className = 'badge-pill badge-blue';
+      badge.textContent = '8 slots ready';
+    }
+  }
+
+  function showBatchProgress(progress, total, completed) {
+    const area = document.getElementById('batchProgressArea');
+    area.style.display = 'block';
+    const pct = typeof progress === 'number' ? progress : 0;
+    document.getElementById('batchProgressBar').style.width = `${pct}%`;
+    const done = completed !== undefined ? completed : Math.floor((pct / 100) * total);
+    document.getElementById('batchProgressLabel').textContent =
+      `${done} / ${total} complete (${pct.toFixed(1)}%)`;
+  }
+
+  function hideBatchProgress() {
+    // Keep visible but at 100%
+    document.getElementById('batchProgressBar').style.width = '100%';
+  }
+
+  function updateQueueBadge(batch) {
+    const running = state.slots.filter(s => s && s.status === 'SIMULATING').length;
+    const badge = document.getElementById('queueBadge');
+    badge.className = 'badge-pill badge-orange';
+    badge.textContent = `${running}/8 active · ${batch.total - batch.completed} queued`;
+  }
+
+  // ═══════════════════════════════════════════════════ PASS/FAIL MATRIX ═
+
+  function renderMatrix() {
+    const items = state.batchItems;
+    if (!items || !items.length) return;
+
+    const universes = [...state.batchUniverses];
+    const matrixHead = document.getElementById('matrixHead');
+    const matrixBody = document.getElementById('matrixBody');
+
+    matrixHead.innerHTML = `<tr>
+      <th style="min-width:160px">Alpha Expression</th>
+      ${universes.map(u => `<th>${u}</th>`).join('')}
+    </tr>`;
+
+    matrixBody.innerHTML = items.map((item, idx) => {
+      const expr = item.expression || '';
+      const shortExpr = expr.length > 40 ? expr.substring(0, 40) + '…' : expr;
+      const cells = universes.map(universe => {
+        if (item.universe !== universe) return `<td class="matrix-cell"><span class="cell-empty">—</span></td>`;
+        const status = item.status;
+        const result = item.result;
+
+        if (status === 'QUEUED') return `<td class="matrix-cell"><span class="cell-pending">⏳ Queued</span></td>`;
+        if (status === 'SIMULATING') return `<td class="matrix-cell"><span class="cell-pending"><i class="fa-solid fa-circle-notch fa-spin"></i> Running</span></td>`;
+        if (status === 'CANCELLED') return `<td class="matrix-cell"><span class="cell-fail">⊘ Cancelled</span></td>`;
+
+        if (result && result.status === 'SUCCESS') {
+          const sharpe = result.metrics?.sharpe;
+          const failed = result.failed_checks || [];
+          if (failed.length === 0) {
+            return `<td class="matrix-cell">
+              <span class="cell-pass">✓ PASS ${sharpe != null ? `(${Number(sharpe).toFixed(2)})` : ''}</span>
+            </td>`;
+          } else {
+            return `<td class="matrix-cell">
+              <span class="cell-fail">✗ ${failed.slice(0,2).join(', ')}${failed.length > 2 ? '…' : ''}</span>
+            </td>`;
+          }
         }
+        if (result && result.status === 'CACHED_DUPLICATE') {
+          const sharpe = result.metrics?.sharpe;
+          return `<td class="matrix-cell">
+            <span class="cell-pass">♻ Cached ${sharpe != null ? `(${Number(sharpe).toFixed(2)})` : ''}</span>
+          </td>`;
+        }
+        return `<td class="matrix-cell"><span class="cell-fail">✗ ${result?.status || 'FAILED'}</span></td>`;
+      }).join('');
+
+      return `<tr>
+        <td class="matrix-alpha-col" title="${escHtml(expr)}">${escHtml(shortExpr)}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    const total = items.length;
+    const passed = items.filter(i => i.result?.status === 'SUCCESS' && !(i.result?.failed_checks?.length)).length;
+    document.getElementById('matrixSubtitle').textContent = `${passed}/${total} passed`;
+  }
+
+  // ═══════════════════════════════════════════════════ RESULTS TABLE ════
+
+  function renderResultsTable() {
+    const tbody = document.getElementById('resultsBody');
+    const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const fStatus = document.getElementById('filterStatus')?.value || 'ALL';
+    const fUniverse = document.getElementById('filterUniverse')?.value || 'ALL';
+    const fSharpe = document.getElementById('filterSharpe')?.value || 'ALL';
+
+    let data = state.results.filter(r => {
+      if (state.eliteOnly && (r.sharpe == null || Number(r.sharpe) < 1.25)) return false;
+      if (fStatus !== 'ALL' && r.status !== fStatus) return false;
+      if (fUniverse !== 'ALL' && r.universe !== fUniverse) return false;
+      if (fSharpe !== 'ALL') {
+        const threshold = parseFloat(fSharpe);
+        if (r.sharpe == null || Number(r.sharpe) < threshold) return false;
+      }
+      if (searchQ) {
+        const searchable = `${r.code || ''} ${r.universe || ''} ${r.neutralization || ''} ${r.status || ''}`.toLowerCase();
+        if (!searchable.includes(searchQ)) return false;
+      }
+      return true;
+    });
+
+    // Sort
+    data = data.sort((a, b) => {
+      let av = a[state.sortCol], bv = b[state.sortCol];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const numA = parseFloat(av), numB = parseFloat(bv);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return state.sortAsc ? numA - numB : numB - numA;
+      }
+      return state.sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+
+    document.getElementById('resultsCountBadge').textContent = `${data.length} alpha${data.length !== 1 ? 's' : ''}`;
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="14" class="empty-row">No results match your filters.</td></tr>';
+      return;
     }
 
-    let activePersonaUrl = null;
-    let activeInquiryId = null;
+    tbody.innerHTML = data.map((r, idx) => {
+      const sharpe = r.sharpe != null ? Number(r.sharpe) : null;
+      const fitness = r.fitness != null ? Number(r.fitness) : null;
+      const returns = r.returns != null ? (Number(r.returns)).toFixed(2) : '—';
+      const drawdown = r.drawdown != null ? (Number(r.drawdown)).toFixed(2) : '—';
+      const margin = r.margin != null ? (Number(r.margin)).toFixed(4) : '—';
+      const turnover = r.turnover != null ? (Number(r.turnover)).toFixed(2) : '—';
 
-    async function handleEmailPasswordLogin() {
-        const email = elements.loginEmailInput.value.trim();
-        const password = elements.loginPasswordInput.value.trim();
-        const personaContainer = document.getElementById('personaContainer');
+      const sharpeClass = sharpe == null ? '' :
+        sharpe >= 1.25 ? 'sharpe-elite' :
+        sharpe >= 1.0  ? 'sharpe-high' :
+        sharpe >= 0.5  ? 'sharpe-ok' :
+        sharpe >= 0    ? 'sharpe-low' : 'sharpe-neg';
 
-        if (!email || !password) {
-            showNotification('Please enter both Email and Password.', 'warning');
-            return;
-        }
+      const sharpeStr = sharpe != null ? sharpe.toFixed(4) : '—';
+      const fitnessStr = fitness != null ? fitness.toFixed(4) : '—';
 
-        elements.loginBrainBtn.disabled = true;
-        elements.loginBrainBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...`;
-        if (personaContainer) personaContainer.style.display = 'none';
+      const statusClass = r.status === 'SUCCESS' ? 'status-success' :
+        r.status === 'CACHED_DUPLICATE' ? 'status-cached' :
+        r.status?.startsWith('FAILED') || r.status === 'ERROR' ? 'status-failed' : 'status-error';
 
-        try {
-            const resp = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
+      const statusLabel = r.status === 'CACHED_DUPLICATE' ? 'CACHED' : (r.status || 'UNKNOWN');
 
-            const data = await resp.json();
-            if (resp.ok && data.success) {
-                showNotification(`Authenticated successfully for ${data.user_email}!`, 'success');
-                elements.cookieModal.classList.remove('active');
-                elements.loginPasswordInput.value = '';
-                checkAuthStatus();
-            } else if (data.requires_persona) {
-                activePersonaUrl = data.persona_url;
-                activeInquiryId = data.inquiry_id;
-                
-                showNotification('Face Verification Required! Click "Complete Face Scan" below.', 'warning');
-                if (personaContainer) {
-                    personaContainer.style.display = 'block';
-                }
-            } else {
-                showNotification(`Login Failed: ${data.message || 'Invalid Credentials'}`, 'error');
+      const failedChecks = (r.failed_checks || []).filter(Boolean);
+      const failedHtml = failedChecks.length
+        ? `<div class="failed-checks">${failedChecks.slice(0,3).map(c => `<span class="check-tag">${escHtml(c)}</span>`).join('')}${failedChecks.length > 3 ? `<span class="check-tag">+${failedChecks.length-3}</span>` : ''}</div>`
+        : '<span style="color:var(--accent-green);font-size:0.7rem">✓ All passed</span>';
+
+      const alphaId = r.alpha_id || '';
+      const expr = r.code || '';
+      const shortExpr = expr.length > 40 ? expr.substring(0, 40) + '…' : expr;
+      const rowId = `res-row-${idx}`;
+      const expandId = `res-expand-${idx}`;
+
+      return `
+      <tr id="${rowId}">
+        <td>
+          <button class="expand-btn" onclick="toggleExpand('${rowId}','${expandId}')" title="Expand details">
+            <i class="fa-solid fa-chevron-right" id="expand-icon-${idx}"></i>
+          </button>
+        </td>
+        <td><span class="status-badge ${statusClass}">${escHtml(statusLabel)}</span></td>
+        <td><span class="sharpe-val ${sharpeClass}">${sharpeStr}</span></td>
+        <td>${fitnessStr}</td>
+        <td>${returns}%</td>
+        <td>${drawdown}%</td>
+        <td>${margin}</td>
+        <td>${turnover}%</td>
+        <td><span style="font-size:0.72rem;font-weight:600;color:var(--accent-blue)">${escHtml(r.universe || '—')}</span></td>
+        <td style="font-size:0.72rem">${escHtml(r.region || '—')}</td>
+        <td style="font-size:0.72rem">${r.delay ?? '—'}</td>
+        <td style="font-size:0.72rem">${escHtml(r.neutralization || '—')}</td>
+        <td>
+          <span class="expr-cell" title="${escHtml(expr)}" onclick="copyText('${encodeURIComponent(expr)}')">${escHtml(shortExpr)}</span>
+        </td>
+        <td>
+          <div class="action-btns">
+            ${alphaId ? `<button class="act-btn act-btn-view" onclick="openPnlModal('${alphaId}', ${JSON.stringify({sharpe, fitness, returns, margin, turnover, drawdown, universe: r.universe, delay: r.delay, neutralization: r.neutralization}).replace(/"/g, '&quot;')})"><i class="fa-solid fa-chart-area"></i> PnL</button>` : ''}
+            <button class="act-btn act-btn-copy" onclick="copyText('${encodeURIComponent(expr)}')"><i class="fa-solid fa-copy"></i></button>
+          </div>
+        </td>
+      </tr>
+      <tr id="${expandId}" class="expanded-row" style="display:none;">
+        <td colspan="14">
+          <div class="expanded-content">
+            <div class="expanded-item"><span class="expanded-label">Alpha ID</span><span class="expanded-value">${escHtml(alphaId || '—')}</span></div>
+            <div class="expanded-item"><span class="expanded-label">Decay</span><span class="expanded-value">${r.decay ?? '—'}</span></div>
+            <div class="expanded-item"><span class="expanded-label">Truncation</span><span class="expanded-value">${r.truncation ?? '—'}</span></div>
+            <div class="expanded-item"><span class="expanded-label">Pasteurization</span><span class="expanded-value">${escHtml(r.pasteurization || '—')}</span></div>
+            <div class="expanded-item"><span class="expanded-label">NaN Handling</span><span class="expanded-value">${escHtml(r.nanHandling || '—')}</span></div>
+            <div class="expanded-item"><span class="expanded-label">Unit Handling</span><span class="expanded-value">${escHtml(r.unitHandling || '—')}</span></div>
+            <div class="expanded-item"><span class="expanded-label">Language</span><span class="expanded-value">${escHtml(r.language || '—')}</span></div>
+            <div class="expanded-item" style="grid-column:1/-1"><span class="expanded-label">Failed Checks</span><div style="margin-top:4px">${failedHtml}</div></div>
+            <div class="expanded-item" style="grid-column:1/-1"><span class="expanded-label">Expression</span><span class="expanded-value" style="font-family:var(--font-mono);font-size:0.68rem;word-break:break-all">${escHtml(expr)}</span></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Expose to inline handlers
+  window.toggleExpand = function(rowId, expandId) {
+    const expandRow = document.getElementById(expandId);
+    const isHidden = expandRow.style.display === 'none';
+    expandRow.style.display = isHidden ? 'table-row' : 'none';
+  };
+
+  window.copyText = function(encoded) {
+    const text = decodeURIComponent(encoded);
+    navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard!', 'success')).catch(() => {});
+  };
+
+  // ═══════════════════════════════════════════════════ PNL MODAL ════════
+
+  window.openPnlModal = async function(alphaId, meta) {
+    showModal('pnlModal');
+    document.getElementById('pnlModalTitle').innerHTML = `<i class="fa-solid fa-chart-area"></i> PnL — ${alphaId}`;
+
+    // Meta grid
+    const metaGrid = document.getElementById('pnlMetaGrid');
+    const metaItems = [
+      { label: 'Sharpe', value: meta.sharpe != null ? Number(meta.sharpe).toFixed(4) : '—' },
+      { label: 'Fitness', value: meta.fitness != null ? Number(meta.fitness).toFixed(4) : '—' },
+      { label: 'Returns', value: meta.returns != null ? meta.returns + '%' : '—' },
+      { label: 'Margin', value: meta.margin != null ? meta.margin : '—' },
+      { label: 'Turnover', value: meta.turnover != null ? meta.turnover + '%' : '—' },
+      { label: 'Drawdown', value: meta.drawdown != null ? meta.drawdown + '%' : '—' },
+      { label: 'Universe', value: meta.universe || '—' },
+      { label: 'Delay', value: meta.delay ?? '—' },
+      { label: 'Neutralization', value: meta.neutralization || '—' }
+    ];
+    metaGrid.innerHTML = metaItems.map(m => `
+      <div class="meta-item">
+        <div class="meta-label">${m.label}</div>
+        <div class="meta-value">${escHtml(String(m.value))}</div>
+      </div>`).join('');
+
+    // Fetch PnL
+    try {
+      const isMock = alphaId.startsWith('MOCK_');
+      const resp = await fetch(`/api/alpha/${alphaId}/pnl${isMock ? '?mock=true' : ''}`);
+      const data = await resp.json();
+      const pnlData = data.pnl || [];
+
+      const labels = pnlData.map(r => r[0]);
+      const values = pnlData.map(r => r[1]);
+
+      const canvas = document.getElementById('pnlCanvas');
+      if (state.pnlChart) { state.pnlChart.destroy(); state.pnlChart = null; }
+
+      state.pnlChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Cumulative PnL',
+            data: values,
+            borderColor: '#00e5ff',
+            backgroundColor: 'rgba(0,229,255,0.06)',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: 'rgba(13,20,36,0.95)',
+              titleColor: '#00e5ff',
+              bodyColor: '#e2e8f0',
+              borderColor: 'rgba(0,229,255,0.3)',
+              borderWidth: 1
             }
-        } catch (e) {
-            showNotification('Server communication error during login.', 'error');
-        } finally {
-            elements.loginBrainBtn.disabled = false;
-            elements.loginBrainBtn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Log In & Authorize Session`;
+          },
+          scales: {
+            x: { ticks: { color: '#475569', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+          }
         }
+      });
+    } catch (_) {
+      document.getElementById('pnlCanvas').parentElement.innerHTML =
+        '<p style="color:var(--text-muted);text-align:center;padding:20px">PnL data unavailable for this alpha.</p>';
     }
+  };
 
-    function launchPersonaScan() {
-        if (!activePersonaUrl) {
-            showNotification('No active Face Verification URL. Please click Log In first.', 'error');
-            return;
-        }
+  // ═══════════════════════════════════════════════════ UI HELPERS ═══════
 
-        // Open directly in new tab — this gives full camera access (HTTPS + no popup restrictions)
-        const newTab = window.open(activePersonaUrl, '_blank');
-        if (newTab) {
-            newTab.focus();
-            showNotification('Face scan opened in new tab. Complete face login there, then come back and click "Verify Completed Face Scan".', 'info');
+  function updateAuthBadge(ok, email) {
+    const badge = document.getElementById('authBadge');
+    const label = document.getElementById('authBadgeLabel');
+    badge.className = ok ? 'auth-badge auth-badge-ok' : 'auth-badge auth-badge-err';
+    label.textContent = ok ? (email || 'Authenticated') : 'Not authenticated';
+  }
 
-            // Start polling for auth completion in background
-            startPersonaPolling();
-        } else {
-            // If popups blocked, instruct user to open manually
-            showNotification('Could not open tab. Click the link to open face scan manually.', 'warning');
-
-            // Show a copy-link helper
-            const personaContainer = document.getElementById('personaContainer');
-            if (personaContainer) {
-                const linkDiv = document.createElement('div');
-                linkDiv.style.cssText = 'margin-top:10px; padding: 8px; background: rgba(0,242,254,0.1); border-radius: 6px; word-break: break-all; font-size: 0.75rem;';
-                linkDiv.innerHTML = `<a href="${activePersonaUrl}" target="_blank" style="color:#38bdf8; text-decoration: underline;">Click here to open Face Scan →</a>`;
-                // Remove old link if exists
-                const oldLink = personaContainer.querySelector('.persona-link');
-                if (oldLink) oldLink.remove();
-                linkDiv.className = 'persona-link';
-                personaContainer.querySelector('.text-center').appendChild(linkDiv);
-            }
-        }
+  function updateRateLimitDisplay(data) {
+    const rem = document.getElementById('rlRemaining');
+    const reset = document.getElementById('rlReset');
+    if (data.remaining != null) rem.textContent = data.remaining;
+    else rem.textContent = '—';
+    if (data.reset_seconds != null) {
+      const mins = Math.ceil(data.reset_seconds / 60);
+      reset.textContent = `(resets in ${mins}m)`;
     }
+  }
 
-    let personaPollTimer = null;
+  function showModal(id) {
+    document.getElementById(id).style.display = 'flex';
+  }
 
-    function startPersonaPolling() {
-        if (personaPollTimer) clearInterval(personaPollTimer);
-        let attempts = 0;
-        const maxAttempts = 30; // poll for 2 minutes max
-
-        personaPollTimer = setInterval(async () => {
-            attempts++;
-            try {
-                const resp = await fetch('/api/auth/status');
-                const data = await resp.json();
-                if (data.authenticated) {
-                    clearInterval(personaPollTimer);
-                    personaPollTimer = null;
-                    showNotification(`Face login verified! Authenticated as ${data.user_email}`, 'success');
-                    
-                    // Hide persona container and close modal
-                    const personaContainer = document.getElementById('personaContainer');
-                    if (personaContainer) personaContainer.style.display = 'none';
-                    elements.cookieModal.classList.remove('active');
-                    checkAuthStatus();
-                }
-            } catch(e) {
-                // ignore polling errors
-            }
-
-            if (attempts >= maxAttempts) {
-                clearInterval(personaPollTimer);
-                personaPollTimer = null;
-            }
-        }, 4000); // check every 4 seconds
+  function hideModal(id) {
+    document.getElementById(id).style.display = 'none';
+    if (id === 'pnlModal' && state.pnlChart) {
+      state.pnlChart.destroy();
+      state.pnlChart = null;
     }
-
-
-    async function handleBiometricAuth() {
-        if (!window.PublicKeyCredential) {
-            showNotification('Biometric / Passkey WebAuthn is not supported in this browser environment.', 'warning');
-            return;
-        }
-
-        elements.biometricAuthBtn.disabled = true;
-        elements.biometricAuthBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Touch ID / Passkey Prompting...`;
-
-        try {
-            // Simulate WebAuthn biometric validation or check auth state
-            await new Promise(res => setTimeout(res, 1200));
-            showNotification('Touch ID / Passkey Verified!', 'success');
-            checkAuthStatus();
-            elements.cookieModal.classList.remove('active');
-        } catch (e) {
-            showNotification('Biometric authentication cancelled or failed.', 'error');
-        } finally {
-            elements.biometricAuthBtn.disabled = false;
-            elements.biometricAuthBtn.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Authenticate with Touch ID / Passkey`;
-        }
-    }
-
-    async function handleSaveCredentials() {
-        const cookie = elements.cookieInput.value.trim();
-        if (!cookie) {
-            showNotification('Please enter a valid Cookie or JWT token string.', 'warning');
-            return;
-        }
-
-        elements.saveCookieBtn.disabled = true;
-        elements.saveCookieBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Validating...`;
-
-        try {
-            const resp = await fetch('/api/auth/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cookie })
-            });
-
-            const data = await resp.json();
-            if (resp.ok && data.success) {
-                showNotification(`Credentials validated for ${data.user_email}!`, 'success');
-                elements.cookieModal.classList.remove('active');
-                elements.cookieInput.value = '';
-                checkAuthStatus();
-            } else {
-                showNotification(`Auth Failed: ${data.message || 'Invalid Cookie'}`, 'error');
-            }
-        } catch (e) {
-            showNotification('Error updating session credentials.', 'error');
-        } finally {
-            elements.saveCookieBtn.disabled = false;
-            elements.saveCookieBtn.innerHTML = `<i class="fa-solid fa-check"></i> Save & Validate Cookie`;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // File Handler
-    // -------------------------------------------------------------------------
-    function handleFileUpload(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const content = e.target.result;
-            const lines = content.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-            if (lines.length === 0) {
-                showNotification('No valid expressions found in file.', 'warning');
-                return;
-            }
-
-            const current = elements.batchInput.value.trim();
-            elements.batchInput.value = current ? `${current}\n${lines.join('\n')}` : lines.join('\n');
-            showNotification(`Loaded ${lines.length} expressions from ${file.name}`, 'success');
-            elements.tabBtns[0].click();
-        };
-        reader.readAsText(file);
-    }
-
-    // -------------------------------------------------------------------------
-    // Launch Batch Simulation with Full Settings
-    // -------------------------------------------------------------------------
-    async function handleLaunchBatch() {
-        const rawInput = elements.batchInput.value.trim();
-        if (!rawInput) {
-            showNotification('Please enter or paste at least one alpha expression.', 'warning');
-            return;
-        }
-
-        let expressions = [];
-        let cleaned = rawInput.trim();
-        if (cleaned.startsWith('```')) {
-            cleaned = cleaned.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
-        }
-        if (cleaned.startsWith('[')) {
-            try {
-                const parsed = JSON.parse(cleaned);
-                if (Array.isArray(parsed)) {
-                    expressions = parsed.map(item => String(item).trim()).filter(Boolean);
-                }
-            } catch (e) {
-                expressions = cleaned.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
-            }
-        } else {
-            expressions = cleaned.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
-        }
-
-        // Clean wrapping quotes or leading/trailing commas from expressions
-        expressions = expressions.map(expr => {
-            let s = expr.trim();
-            while (s.length > 1 && ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")) || s.startsWith(',') || s.endsWith(','))) {
-                if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-                    s = s.slice(1, -1).trim();
-                } else if (s.startsWith(',')) {
-                    s = s.slice(1).trim();
-                } else if (s.endsWith(',')) {
-                    s = s.slice(0, -1).trim();
-                }
-            }
-            return s;
-        }).filter(Boolean);
-
-        if (expressions.length === 0) {
-            showNotification('No valid alpha expressions parsed.', 'warning');
-            return;
-        }
-
-        const payload = {
-            expressions: expressions,
-            settings: {
-                universe: elements.settingUniverse.value,
-                neutralization: elements.settingNeutralization.value,
-                delay: parseInt(elements.settingDelay.value, 10),
-                decay: parseInt(elements.settingDecay.value, 10),
-                region: elements.settingRegion.value,
-                truncation: parseFloat(elements.settingTruncation.value) || 0.08,
-                pasteurization: elements.settingPasteurization.value,
-                nanHandling: elements.settingNanHandling.value,
-                unitHandling: elements.settingUnitHandling.value,
-                language: elements.settingLanguage.value,
-                dry_run: elements.settingDryRun.checked,
-                auto_submit: elements.settingAutoSubmit.checked
-            }
-        };
-
-        elements.launchBatchBtn.disabled = true;
-        elements.launchBatchBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Launching...`;
-
-        try {
-            const resp = await fetch('/api/simulations/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await resp.json();
-            if (resp.ok && data.batch_id) {
-                showNotification(`Launched batch ${data.batch_id} with ${data.total_enqueued} alphas!`, 'success');
-                fetchQueueAndResults();
-            } else {
-                showNotification(`Launch Error: ${data.error || 'Failed to submit batch'}`, 'error');
-            }
-        } catch (e) {
-            showNotification('Server communication error during launch.', 'error');
-        } finally {
-            elements.launchBatchBtn.disabled = false;
-            elements.launchBatchBtn.innerHTML = `<i class="fa-solid fa-play"></i> Launch Batch Simulation`;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Fetch Queue, Slots & Results Data
-    // -------------------------------------------------------------------------
-    let currentSlots = [];
-
-    async function fetchQueueAndResults() {
-        try {
-            const [batchesResp, resultsResp, slotsResp] = await Promise.all([
-                fetch('/api/simulations/batches'),
-                fetch('/api/results'),
-                fetch('/api/simulations/slots')
-            ]);
-
-            if (batchesResp.ok) {
-                const batchData = await batchesResp.json();
-                currentBatches = Array.isArray(batchData) ? batchData : Object.values(batchData.batches || batchData || {});
-            }
-
-            if (slotsResp.ok) {
-                currentSlots = await slotsResp.json();
-            }
-
-            renderActiveQueue();
-
-            if (resultsResp.ok) {
-                const resultsData = await resultsResp.json();
-                currentResults = Array.isArray(resultsData) ? resultsData : (resultsData.results || []);
-                renderResultsTable();
-            }
-        } catch (e) {
-            console.error('Error fetching dashboard queue and results:', e);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Unified Item Property Extractor
-    // -------------------------------------------------------------------------
-    function getItemProps(item, idx) {
-        const expr = item.code || item.expression || item.regular || '';
-        const m = item.metrics || item;
-        const sharpe = m.sharpe !== undefined && m.sharpe !== null ? Number(m.sharpe) : null;
-        const fitness = m.fitness !== undefined && m.fitness !== null ? Number(m.fitness) : null;
-        const returns = m.returns !== undefined && m.returns !== null ? Number(m.returns) : null;
-        const drawdown = m.drawdown !== undefined && m.drawdown !== null ? Number(m.drawdown) : null;
-        const margin = m.margin !== undefined && m.margin !== null ? Number(m.margin) : null;
-        const turnover = m.turnover !== undefined && m.turnover !== null ? Number(m.turnover) : null;
-
-        const hash = item.hash || item.alpha_id || `ITEM_${idx}_${expr.substring(0, 10)}`;
-
-        return {
-            expression: expr,
-            status: item.status || 'UNKNOWN',
-            sharpe,
-            fitness,
-            returns,
-            drawdown,
-            margin,
-            turnover,
-            universe: item.universe || item.settings?.universe || 'TOP3000',
-            delay: item.delay !== undefined ? item.delay : (item.settings?.delay ?? 1),
-            decay: item.decay !== undefined ? item.decay : (item.settings?.decay ?? 2),
-            neutralization: item.neutralization || item.settings?.neutralization || 'INDUSTRY',
-            region: item.region || item.settings?.region || 'USA',
-            truncation: item.truncation || item.settings?.truncation || 0.08,
-            pasteurization: item.pasteurization || item.settings?.pasteurization || 'ON',
-            nanHandling: item.nanHandling || item.settings?.nanHandling || 'ON',
-            unitHandling: item.unitHandling || item.settings?.unitHandling || 'VERIFY',
-            language: item.language || item.settings?.language || 'FASTEXPR',
-            failed_checks: item.failed_checks || [],
-            alpha_id: item.alpha_id || hash,
-            hash: hash
-        };
-    }
-
-    // -------------------------------------------------------------------------
-    // Render Active Queue Panel — 7 Live Slots + Batch Progress
-    // -------------------------------------------------------------------------
-    function renderActiveQueue() {
-        const activeJobs = currentBatches.filter(b => b.status === 'RUNNING' || b.status === 'PENDING');
-        const totalQueued = activeJobs.reduce((s, b) => s + (b.queued_remaining || 0), 0);
-        const totalSimulating = (currentSlots || []).filter(s => s.status === 'SIMULATING').length;
-
-        elements.queueStatsBadge.textContent = activeJobs.length > 0
-            ? `${totalSimulating} Running • ${totalQueued} Queued`
-            : `${currentBatches.length} Batches Total`;
-        elements.queueStatsBadge.className = activeJobs.length > 0 ? 'badge badge-orange' : 'badge badge-purple';
-
-        if (currentBatches.length === 0 && (!currentSlots || currentSlots.every(s => s.status === 'IDLE'))) {
-            elements.activeQueueContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-layer-group empty-icon"></i>
-                    <p>No active batch simulation running.</p>
-                    <span class="sub-text">Enter expressions on the left and click "Launch Batch Simulation"</span>
-                </div>`;
-            return;
-        }
-
-        let html = '';
-
-        // ── 7 Slot Live Monitor ──────────────────────────────────────────────
-        if (currentSlots && currentSlots.length > 0) {
-            const busySlots = currentSlots.filter(s => s.status === 'SIMULATING').length;
-            html += `
-            <div class="slots-monitor glass-card" style="margin-bottom:14px; padding:12px; border:1px solid rgba(0,242,254,0.2); border-radius:10px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                    <span style="font-weight:700; font-size:0.85rem; color:#38bdf8;">
-                        <i class="fa-solid fa-microchip"></i>&nbsp; Concurrent Simulation Slots
-                    </span>
-                    <span style="font-size:0.75rem; color:#64748b;">${busySlots}/7 Active</span>
-                </div>
-                <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:6px;">`;
-
-            for (const slot of currentSlots) {
-                const isActive = slot.status === 'SIMULATING';
-                const expr = slot.expression || '';
-                const shortExpr = expr.length > 22 ? expr.substring(0, 22) + '…' : expr;
-                const elapsed = slot.start_time ? Math.floor((Date.now() - new Date(slot.start_time).getTime()) / 1000) : 0;
-                const elapsedStr = elapsed > 0 ? `${elapsed}s` : '';
-
-                html += `
-                <div title="${isActive ? expr : 'Idle'}" style="
-                    background: ${isActive ? 'linear-gradient(135deg, rgba(0,242,254,0.15), rgba(79,172,254,0.08))' : 'rgba(255,255,255,0.03)'};
-                    border: 1px solid ${isActive ? 'rgba(0,242,254,0.5)' : 'rgba(255,255,255,0.07)'};
-                    border-radius: 8px;
-                    padding: 8px 6px;
-                    text-align: center;
-                    transition: all 0.3s;
-                    min-height: 72px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 3px;
-                ">
-                    <div style="font-size:0.65rem; font-weight:700; color:${isActive ? '#00f2fe' : '#334155'}; letter-spacing:0.05em;">
-                        SLOT ${slot.slot}
-                    </div>
-                    ${isActive ? `
-                        <i class="fa-solid fa-circle-notch fa-spin" style="color:#00f2fe; font-size:0.9rem;"></i>
-                        <div style="font-size:0.6rem; color:#94a3b8; word-break:break-all; line-height:1.2;">${shortExpr}</div>
-                        ${elapsedStr ? `<div style="font-size:0.6rem; color:#4facfe;">${elapsedStr}</div>` : ''}
-                    ` : `
-                        <i class="fa-solid fa-circle" style="color:#1e293b; font-size:0.7rem;"></i>
-                        <div style="font-size:0.6rem; color:#334155;">idle</div>
-                    `}
-                </div>`;
-            }
-
-            html += `</div></div>`;
-        }
-
-        // ── Batch Progress Cards ─────────────────────────────────────────────
-        currentBatches.slice(0, 8).forEach(batch => {
-            const completedCount = batch.completed || 0;
-            const totalCount = batch.total || 1;
-            const pct = Math.round((completedCount / totalCount) * 100);
-            const isFinished = batch.status === 'COMPLETED';
-            const isCancelled = batch.status === 'CANCELLED';
-            const simNow = batch.simulating_now || 0;
-            const queuedLeft = batch.queued_remaining || 0;
-
-            const createdTimeStr = typeof batch.created_at === 'number'
-                ? new Date(batch.created_at * 1000).toLocaleTimeString()
-                : new Date(batch.created_at).toLocaleTimeString();
-
-            let statusColor = isFinished ? 'badge-green' : isCancelled ? 'badge-red' : 'badge-orange';
-            let progressColor = isFinished ? '#22c55e' : isCancelled ? '#ef4444' : '#00f2fe';
-
-            html += `
-                <div class="job-card ${isFinished ? 'job-card-completed' : isCancelled ? 'job-card-cancelled' : 'job-card-active'}">
-                    <div class="job-card-header">
-                        <div class="job-title">
-                            <span class="batch-id"><i class="fa-solid fa-layer-group"></i> ${batch.batch_id}</span>
-                            <span class="badge ${statusColor}">${batch.status}</span>
-                        </div>
-                        <span class="job-time">${createdTimeStr}</span>
-                    </div>
-
-                    <div class="job-progress-info">
-                        <span>Completed: <strong>${completedCount} / ${totalCount}</strong></span>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            ${simNow > 0 ? `<span style="color:#00f2fe; font-size:0.75rem;"><i class="fa-solid fa-circle-notch fa-spin"></i> ${simNow} running</span>` : ''}
-                            ${queuedLeft > 0 ? `<span style="color:#94a3b8; font-size:0.75rem;">${queuedLeft} queued</span>` : ''}
-                            <span class="font-bold" style="color:${progressColor};">${pct}%</span>
-                        </div>
-                    </div>
-
-                    <div class="progress-bar-container margin-top-xs">
-                        <div class="progress-bar-fill" style="width: ${pct}%; background: ${isCancelled ? '#ef4444' : 'linear-gradient(90deg, #00f2fe, #4facfe)'};"></div>
-                    </div>
-
-                    <div class="job-meta flex-wrap margin-top-xs">
-                        <span>Region: <strong>${batch.settings?.region || 'USA'}</strong></span>
-                        <span>Universe: <strong>${batch.settings?.universe || 'TOP3000'}</strong></span>
-                        <span>Delay: <strong>${batch.settings?.delay ?? 1}</strong></span>
-                        <span>Neut: <strong>${batch.settings?.neutralization || 'INDUSTRY'}</strong></span>
-                        ${batch.dry_run || batch.settings?.dry_run ? '<span class="badge badge-purple">Dry-Run</span>' : ''}
-                    </div>
-                </div>`;
-        });
-
-        elements.activeQueueContainer.innerHTML = html;
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Render Multi-Filtered Results Table with Details Drawers
-    // -------------------------------------------------------------------------
-    function renderResultsTable() {
-        let items = currentResults.map((item, idx) => getItemProps(item, idx));
-
-        // 1. Search Query Filter
-        const searchTxt = elements.searchInput.value.toLowerCase().trim();
-        if (searchTxt) {
-            items = items.filter(item => {
-                const expr = item.expression.toLowerCase();
-                const code = item.alpha_id.toLowerCase();
-                const uni = String(item.universe).toLowerCase();
-                const neut = String(item.neutralization).toLowerCase();
-                return expr.includes(searchTxt) || code.includes(searchTxt) || uni.includes(searchTxt) || neut.includes(searchTxt);
-            });
-        }
-
-        // 2. Status Filter
-        const statusVal = elements.filterStatus.value;
-        if (statusVal !== 'ALL') {
-            items = items.filter(item => item.status === statusVal);
-        }
-
-        // 3. Universe Filter
-        const universeVal = elements.filterUniverse ? elements.filterUniverse.value : 'ALL';
-        if (universeVal !== 'ALL') {
-            items = items.filter(item => String(item.universe).toUpperCase() === universeVal.toUpperCase());
-        }
-
-        // 4. Neutralization Filter
-        const neutVal = elements.filterNeutralization ? elements.filterNeutralization.value : 'ALL';
-        if (neutVal !== 'ALL') {
-            items = items.filter(item => String(item.neutralization).toUpperCase() === neutVal.toUpperCase());
-        }
-
-        // 5. Sharpe Ratio Threshold Filter
-        const sharpeVal = elements.filterSharpe.value;
-        if (sharpeVal !== 'ALL') {
-            const minSharpe = parseFloat(sharpeVal);
-            items = items.filter(item => item.sharpe !== null && item.sharpe >= minSharpe);
-        }
-
-        // 6. Elite Alphas Only Toggle Filter
-        if (isEliteOnlyFilter) {
-            items = items.filter(item => item.sharpe !== null && item.sharpe >= 1.25 && item.fitness !== null && item.fitness >= 1.0);
-        }
-
-        // Update count badge
-        if (elements.resultsCountBadge) {
-            elements.resultsCountBadge.textContent = `${items.length} Alphas`;
-        }
-
-        // Sort
-        items.sort((a, b) => {
-            let valA = a[sortColumn] !== null && a[sortColumn] !== undefined ? a[sortColumn] : -9999;
-            let valB = b[sortColumn] !== null && b[sortColumn] !== undefined ? b[sortColumn] : -9999;
-
-            if (valA < valB) return sortAscending ? -1 : 1;
-            if (valA > valB) return sortAscending ? 1 : -1;
-            return 0;
-        });
-
-        if (items.length === 0) {
-            elements.resultsTableBody.innerHTML = `
-                <tr>
-                    <td colspan="12" class="text-center text-muted">No simulation results match the selected compound filters.</td>
-                </tr>`;
-            return;
-        }
-
-        let html = '';
-        items.slice(0, 200).forEach(item => {
-            const sharpeStr = item.sharpe !== null ? item.sharpe.toFixed(3) : '-';
-            const fitnessStr = item.fitness !== null ? item.fitness.toFixed(3) : '-';
-            
-            const returnsStr = item.returns !== null ? (item.returns > 1 ? item.returns.toFixed(2) + '%' : (item.returns * 100).toFixed(2) + '%') : '-';
-            const drawdownStr = item.drawdown !== null ? (Math.abs(item.drawdown) > 1 ? item.drawdown.toFixed(2) + '%' : (item.drawdown * 100).toFixed(2) + '%') : '-';
-            const marginStr = item.margin !== null ? (item.margin > 1 ? item.margin.toFixed(2) : (item.margin * 10000).toFixed(2)) : '-';
-            const turnoverStr = item.turnover !== null ? (item.turnover > 1 ? item.turnover.toFixed(1) + '%' : (item.turnover * 100).toFixed(1) + '%') : '-';
-
-            // Status Badge
-            let statusBadge = '';
-            if (item.status === 'SUCCESS' || item.status === 'COMPLETE') {
-                statusBadge = `<span class="badge badge-green"><i class="fa-solid fa-check"></i> SUCCESS</span>`;
-            } else if (item.status === 'CACHED_DUPLICATE' || item.status === 'CACHED') {
-                statusBadge = `<span class="badge badge-blue"><i class="fa-solid fa-database"></i> CACHED</span>`;
-            } else {
-                statusBadge = `<span class="badge badge-red"><i class="fa-solid fa-triangle-exclamation"></i> FAILED</span>`;
-            }
-
-            const isElite = item.sharpe !== null && item.sharpe >= 1.25 && item.fitness !== null && item.fitness >= 1.0;
-            const rowClass = isElite ? 'row-highlight-elite' : '';
-            const isExpanded = expandedRowHashes.has(item.hash);
-
-            html += `
-                <tr class="${rowClass}">
-                    <td>
-                        <button class="btn-icon expand-toggle-btn" data-hash="${item.hash}">
-                            <i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
-                        </button>
-                    </td>
-                    <td>${statusBadge}</td>
-                    <td class="${item.sharpe >= 1.25 ? 'text-green font-bold' : ''}">${sharpeStr}</td>
-                    <td class="${item.fitness >= 1.0 ? 'text-purple font-bold' : ''}">${fitnessStr}</td>
-                    <td>${returnsStr}</td>
-                    <td class="text-orange">${drawdownStr}</td>
-                    <td>${marginStr}</td>
-                    <td>${turnoverStr}</td>
-                    <td><span class="badge badge-secondary">${item.universe}</span></td>
-                    <td><span class="badge badge-secondary">D${item.delay}</span></td>
-                    <td class="code-cell" title="${escapeHtml(item.expression)}">${escapeHtml(truncate(item.expression, 50))}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn btn-xs btn-secondary view-pnl-btn" data-hash="${item.hash}" data-code="${escapeHtml(item.expression)}">
-                                <i class="fa-solid fa-chart-line"></i> PnL
-                            </button>
-                            <button class="btn btn-xs btn-secondary copy-alpha-btn" data-code="${escapeHtml(item.expression)}">
-                                <i class="fa-solid fa-copy"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>`;
-
-            // Render details drawer row if expanded
-            if (isExpanded) {
-                const checksBadges = item.failed_checks.length > 0 
-                    ? item.failed_checks.map(c => `<span class="badge badge-red">${c}</span>`).join(' ') 
-                    : '<span class="badge badge-green">ALL CHECKS PASSED</span>';
-
-                html += `
-                    <tr class="drawer-row">
-                        <td colspan="12" style="padding: 0;">
-                            <div class="drawer-content">
-                                <div class="drawer-header">
-                                    <strong><i class="fa-solid fa-sliders"></i> Full Simulation Metadata & Expression Settings</strong>
-                                </div>
-                                <div class="detail-grid">
-                                    <div class="detail-cell"><span class="detail-label">Expression Code:</span><code class="detail-val-code">${escapeHtml(item.expression)}</code></div>
-                                    <div class="detail-cell"><span class="detail-label">Universe:</span><strong>${item.universe}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Neutralization:</span><strong>${item.neutralization}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Delay:</span><strong>Delay ${item.delay}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Decay:</span><strong>${item.decay}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Region:</span><strong>${item.region}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Truncation:</span><strong>${item.truncation}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Pasteurization:</span><strong>${item.pasteurization}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">NaN Handling:</span><strong>${item.nanHandling}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Unit Handling:</span><strong>${item.unitHandling}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Language:</span><strong>${item.language}</strong></div>
-                                    <div class="detail-cell"><span class="detail-label">Checks:</span>${checksBadges}</div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>`;
-            }
-        });
-
-        elements.resultsTableBody.innerHTML = html;
-
-        // Attach Expand Row Handlers
-        document.querySelectorAll('.expand-toggle-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const hash = btn.getAttribute('data-hash');
-                if (expandedRowHashes.has(hash)) {
-                    expandedRowHashes.delete(hash);
-                } else {
-                    expandedRowHashes.add(hash);
-                }
-                renderResultsTable();
-            });
-        });
-
-        // Attach action handlers for PnL and Copy buttons
-        document.querySelectorAll('.view-pnl-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const hash = btn.getAttribute('data-hash');
-                const code = btn.getAttribute('data-code');
-                openPnLModal(hash, code);
-            });
-        });
-
-        document.querySelectorAll('.copy-alpha-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const code = btn.getAttribute('data-code');
-                navigator.clipboard.writeText(code);
-                showNotification('Alpha expression copied to clipboard!', 'info');
-            });
-        });
-    }
-
-    // -------------------------------------------------------------------------
-    // Open PnL Modal & Render Chart.js
-    // -------------------------------------------------------------------------
-    async function openPnLModal(hash, expressionCode) {
-        elements.pnlModal.classList.add('active');
-        elements.modalAlphaTitle.innerHTML = `<i class="fa-solid fa-chart-area"></i> Alpha Performance & PnL`;
-
-        const rawItem = currentResults.find(r => r.hash === hash || r.alpha_id === hash || r.code === expressionCode);
-        const item = rawItem ? getItemProps(rawItem, 0) : { sharpe: 1.25, fitness: 1.1, returns: 0.15, drawdown: -0.08 };
-
-        elements.modalAlphaDetails.innerHTML = `
-            <div class="stat-card"><span class="stat-label">Sharpe Ratio</span><span class="stat-val text-green">${item.sharpe !== null ? item.sharpe.toFixed(3) : '-'}</span></div>
-            <div class="stat-card"><span class="stat-label">Fitness</span><span class="stat-val text-purple">${item.fitness !== null ? item.fitness.toFixed(3) : '-'}</span></div>
-            <div class="stat-card"><span class="stat-label">Annual Return</span><span class="stat-val">${item.returns !== null ? (item.returns > 1 ? item.returns.toFixed(2) : (item.returns * 100).toFixed(2)) + '%' : '-'}</span></div>
-            <div class="stat-card"><span class="stat-label">Max Drawdown</span><span class="stat-val text-orange">${item.drawdown !== null ? (Math.abs(item.drawdown) > 1 ? item.drawdown.toFixed(2) : (item.drawdown * 100).toFixed(2)) + '%' : '-'}</span></div>
-        `;
-
-        let pnlData = [];
-        let labels = [];
-
-        try {
-            if (item.alpha_id && !item.alpha_id.startsWith('MOCK')) {
-                const resp = await fetch(`/api/alpha/${item.alpha_id}/pnl`);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (data.records) {
-                        labels = data.records.map(r => r[0]);
-                        pnlData = data.records.map(r => r[1]);
-                    }
-                }
-            }
-        } catch (e) {
-            console.log('PnL fetch fallback to synthetic curve');
-        }
-
-        if (pnlData.length === 0) {
-            const days = 252 * 4;
-            const sharpe = item.sharpe || 1.25;
-            let cumulative = 1.0;
-            labels = [];
-            pnlData = [];
-
-            const startDate = new Date('2022-01-01');
-            for (let i = 0; i < days; i++) {
-                const d = new Date(startDate);
-                d.setDate(d.getDate() + i);
-                labels.push(d.toISOString().split('T')[0]);
-
-                const dailyReturn = (sharpe * 0.15 / Math.sqrt(252)) + ((Math.random() - 0.48) * 0.01);
-                cumulative *= (1 + dailyReturn);
-                pnlData.push(Number(cumulative.toFixed(4)));
-            }
-        }
-
-        if (pnlChartInstance) {
-            pnlChartInstance.destroy();
-        }
-
-        const ctx = elements.pnlChartCanvas.getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, 'rgba(0, 242, 254, 0.4)');
-        gradient.addColorStop(1, 'rgba(79, 172, 254, 0.0)');
-
-        pnlChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Cumulative PnL',
-                    data: pnlData,
-                    borderColor: '#00f2fe',
-                    borderWidth: 2,
-                    fill: true,
-                    backgroundColor: gradient,
-                    tension: 0.1,
-                    pointRadius: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                        titleColor: '#f8fafc',
-                        bodyColor: '#38bdf8',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8', maxTicksLimit: 10 }
-                    },
-                    y: {
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
-                    }
-                }
-            }
-        });
-    }
-
-    // -------------------------------------------------------------------------
-    // Notification Utility
-    // -------------------------------------------------------------------------
-    function showNotification(msg, type = 'info') {
-        const notif = document.createElement('div');
-        notif.className = `notification notification-${type}`;
-        notif.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info'}"></i> <span>${escapeHtml(msg)}</span>`;
-        
-        let container = document.getElementById('notificationContainer');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'notificationContainer';
-            container.style.position = 'fixed';
-            container.style.bottom = '20px';
-            container.style.right = '20px';
-            container.style.zIndex = '99999';
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.gap = '10px';
-            document.body.appendChild(container);
-        }
-
-        container.appendChild(notif);
-        setTimeout(() => {
-            notif.style.opacity = '0';
-            setTimeout(() => notif.remove(), 300);
-        }, 3500);
-    }
-
-    function truncate(str, maxLen = 50) {
-        if (!str) return '';
-        return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    // Start App
-    init();
+  }
+
+  // ═══════════════════════════════════════════════════ TOAST ════════════
+
+  function toast(msg, type = 'info') {
+    const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+    const container = document.getElementById('toastContainer');
+    const div = document.createElement('div');
+    div.className = `toast toast-${type}`;
+    div.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${escHtml(msg)}</span>`;
+    container.appendChild(div);
+    setTimeout(() => {
+      div.classList.add('hiding');
+      setTimeout(() => div.remove(), 300);
+    }, 4000);
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ═══════════════════════════════════════════════════ START ════════════
+  init();
 });

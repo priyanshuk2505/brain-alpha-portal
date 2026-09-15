@@ -37,7 +37,10 @@ auth_state = {
     "cookie": DEFAULT_COOKIE,
     "user_email": "priyanshubhadani25@gmail.com",
     "authenticated": False,
-    "last_checked": None
+    "last_checked": None,
+    "pending_persona_url": None,   # URL to POST to after face scan
+    "pending_email": None,         # email pending persona verification
+    "pending_password": None       # password pending persona verification
 }
 
 
@@ -56,15 +59,18 @@ def load_auth_credentials():
         except Exception as e:
             print(f"Error loading ~/.brain_credentials: {e}")
 
-    # 2. Check auth_credentials.json
+    # 2. Check auth_credentials.json — apply saved cookie immediately to the session
     if os.path.exists(AUTH_FILE):
         try:
             with open(AUTH_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if data.get("cookie"):
-                    auth_state["cookie"] = data.get("cookie")
+                    auth_state["cookie"] = data["cookie"]
+                    # *** CRITICAL FIX: actually apply the cookie to the requests.Session ***
+                    _apply_session_cookie(data["cookie"])
+                    print(f"[AUTH] Loaded saved cookie from {AUTH_FILE} and applied to session.")
                 if data.get("user_email"):
-                    auth_state["user_email"] = data.get("user_email")
+                    auth_state["user_email"] = data["user_email"]
         except Exception as e:
             print(f"Error loading auth credentials: {e}")
 
@@ -88,7 +94,9 @@ def save_auth_credentials(email=None, password=None):
         except Exception as e:
             print(f"Error saving ~/.brain_credentials: {e}")
 
-load_auth_credentials()
+# NOTE: _apply_session_cookie is defined later, so we defer calling load_auth_credentials
+# until after all functions are defined. See end of startup block.
+
 
 # In-Memory Cache and Batch Jobs Storage
 cache_lock = threading.Lock()
@@ -232,19 +240,34 @@ def authenticate_brain_user(email, password):
                     except Exception:
                         pass
 
-                # Persona URL to open in browser
+                # The browser display URL (for user to open and do face scan)
                 if inquiry_id:
-                    persona_url = f"https://platform.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}"
+                    browser_persona_url = f"https://api.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}"
                 else:
-                    # Fallback: build from response URL + Location header
-                    from urllib.parse import urljoin
-                    persona_url = urljoin(resp.url, location) if location else "https://platform.worldquantbrain.com"
+                    browser_persona_url = "https://api.worldquantbrain.com"
+
+                # The API completion URL (what we POST to after face scan — per BRAIN Python SDK)
+                # urljoin(resp.url, location) where resp.url = https://api.worldquantbrain.com/authentication
+                from urllib.parse import urljoin
+                if location:
+                    api_persona_url = urljoin("https://api.worldquantbrain.com/authentication", location)
+                elif inquiry_id:
+                    api_persona_url = f"https://api.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}"
+                else:
+                    api_persona_url = ""
 
                 auth_state["authenticated"] = False
                 auth_state["user_email"] = email
+                # Store BOTH URLs: browser URL (for user) and API URL (for POST)
+                auth_state["pending_persona_url"] = browser_persona_url   # shown to user
+                auth_state["pending_api_persona_url"] = api_persona_url   # used in POST
+                auth_state["pending_email"] = email
+                auth_state["pending_password"] = password
                 save_auth_credentials()
-                print(f"[AUTH] Persona required for {email}. URL: {persona_url}")
-                return False, f"Face verification required for {email}. Open the link to complete.", inquiry_id, persona_url
+                print(f"[AUTH] Persona required for {email}.")
+                print(f"[AUTH]   Browser URL: {browser_persona_url}")
+                print(f"[AUTH]   API URL:     {api_persona_url}")
+                return False, f"Face verification required for {email}. Open the link to complete.", inquiry_id, browser_persona_url
             else:
                 auth_state["authenticated"] = False
                 err_detail = ""
@@ -261,26 +284,79 @@ def authenticate_brain_user(email, password):
         auth_state["authenticated"] = False
         return False, f"Connection error: {str(e)}", None, None
 
+def _jwt_is_expired(cookie_str):
+    """Quickly decode the JWT payload and check expiry without hitting BRAIN."""
+    try:
+        token = ""
+        for part in cookie_str.split(";"):
+            part = part.strip()
+            if part.startswith("t="):
+                token = part[2:]
+                break
+        if not token:
+            return True
+        payload_b64 = token.split(".")[1]
+        padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
+        import base64
+        payload = json.loads(base64.urlsafe_b64decode(padded))
+        exp = payload.get("exp", 0)
+        return time.time() > exp
+    except Exception:
+        return True  # treat unreadable JWT as expired
+
 def check_auth_status():
     session = get_brain_session()
+
+    # ── Fast pre-check: decode JWT locally to avoid unnecessary network calls ──
+    current_cookie = auth_state.get("cookie", "")
+    if current_cookie and _jwt_is_expired(current_cookie):
+        auth_state["authenticated"] = False
+        # Try auto-refresh with saved credentials (email+password in ~/.brain_credentials)
+        if auth_state.get("saved_email") and auth_state.get("saved_password"):
+            print(f"[AUTH] JWT expired locally. Auto-refreshing for {auth_state['saved_email']}...")
+            ok, msg, inquiry_id, persona_url = authenticate_brain_user(
+                auth_state["saved_email"], auth_state["saved_password"])
+            if ok:
+                return True, auth_state["user_email"]
+            if persona_url:
+                # Face scan needed — surface the pending URL so frontend shows the face ID step
+                return False, f"FACE_REQUIRED:{persona_url}"
+        return False, "JWT expired. Please log in again."
+
     try:
-        resp = session.get("https://api.worldquantbrain.com/users/self", timeout=8)
+        # Correct endpoint: GET /authentication (per BRAIN API docs)
+        resp = session.get("https://api.worldquantbrain.com/authentication", timeout=8)
         if resp.status_code == 200:
             data = resp.json()
             auth_state["authenticated"] = True
-            auth_state["user_email"] = data.get("email") or data.get("username") or auth_state["user_email"]
+            user_data = data.get("user") or {}
+            auth_state["user_email"] = user_data.get("id") or data.get("email") or auth_state["user_email"]
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
             save_auth_credentials()
             return True, auth_state["user_email"]
-        elif resp.status_code == 401 and auth_state.get("saved_email") and auth_state.get("saved_password"):
-            print(f"[AUTH] Session expired (HTTP 401). Auto-refreshing using saved credentials for {auth_state['saved_email']}...")
-            ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
-            if ok:
-                return True, auth_state["user_email"]
-            return False, f"Auto-refresh failed: {msg}"
+        elif resp.status_code == 204:
+            auth_state["authenticated"] = False
+            if auth_state.get("saved_email") and auth_state.get("saved_password"):
+                print(f"[AUTH] Not authenticated (204). Auto-refreshing for {auth_state['saved_email']}...")
+                ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
+                if ok:
+                    return True, auth_state["user_email"]
+                if persona_url:
+                    return False, f"FACE_REQUIRED:{persona_url}"
+            return False, "Not authenticated. Please log in."
+        elif resp.status_code == 401:
+            auth_state["authenticated"] = False
+            if auth_state.get("saved_email") and auth_state.get("saved_password"):
+                ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
+                if ok:
+                    return True, auth_state["user_email"]
+                if persona_url:
+                    return False, f"FACE_REQUIRED:{persona_url}"
+            return False, "Session expired. Please re-login."
         else:
             auth_state["authenticated"] = False
-            return False, f"HTTP {resp.status_code} — session may be expired. Please re-login."
+            return False, f"HTTP {resp.status_code} from BRAIN. Please re-login."
+
     except Exception as e:
         auth_state["authenticated"] = False
         return False, str(e)
@@ -323,22 +399,33 @@ def extract_metrics(data, session, headers=None):
 
 def _build_sim_payload(expression, settings):
     """Build the simulation payload dict from expression + settings."""
+    payload_settings = {
+        "instrumentType": settings.get("instrumentType", "EQUITY"),
+        "region": settings.get("region", "USA"),
+        "universe": settings.get("universe", "TOP3000"),
+        "delay": int(settings.get("delay", 1)),
+        "decay": int(settings.get("decay", 0)),
+        "neutralization": settings.get("neutralization", "INDUSTRY"),
+        "truncation": float(settings.get("truncation", 0.08)),
+        "pasteurization": settings.get("pasteurization", "ON"),
+        "nanHandling": settings.get("nanHandling", "OFF"),
+        "language": settings.get("language", "FASTEXPR"),
+        "unitHandling": settings.get("unitHandling", "VERIFY"),
+        "visualization": False,
+    }
+    # Optional settings — only include if set to non-default values
+    test_period = settings.get("testPeriod", "")
+    if test_period and test_period not in ["", "P0Y0M", "P0Y"]:
+        payload_settings["testPeriod"] = test_period
+    max_trade = settings.get("maxTrade", "OFF")
+    if max_trade and max_trade.upper() != "OFF":
+        payload_settings["maxTrade"] = max_trade.upper()
+    max_position = settings.get("maxPosition", "OFF")
+    if max_position and max_position.upper() != "OFF":
+        payload_settings["maxPosition"] = max_position.upper()
     return {
         "type": "REGULAR",
-        "settings": {
-            "instrumentType": settings.get("instrumentType", "EQUITY"),
-            "region": settings.get("region", "USA"),
-            "universe": settings.get("universe", "TOP3000"),
-            "delay": int(settings.get("delay", 1)),
-            "decay": int(settings.get("decay", 0)),
-            "neutralization": settings.get("neutralization", "INDUSTRY"),
-            "truncation": float(settings.get("truncation", 0.08)),
-            "pasteurization": settings.get("pasteurization", "ON"),
-            "nanHandling": settings.get("nanHandling", "ON"),
-            "language": settings.get("language", "FASTEXPR"),
-            "unitHandling": settings.get("unitHandling", "VERIFY"),
-            "visualization": False
-        },
+        "settings": payload_settings,
         "regular": expression.strip()
     }
 
@@ -590,17 +677,23 @@ def log_result_to_csv(result, expression, settings):
     except Exception as e:
         print(f"Error logging to CSV: {e}")
 
+# ── Startup: load saved credentials NOW (all helpers are defined above) ──────
+# This is the fix for "already logged in" not working across restarts.
+# load_auth_credentials() calls _apply_session_cookie() which requires
+# _brain_session to exist \u2014 which it does by line 132 above.
+load_auth_credentials()
+print(f"[STARTUP] Auth state: email={auth_state.get('user_email')} cookie={'SET' if auth_state.get('cookie') else 'NONE'}")
 
 # -----------------------------------------------------------------------------
-# Background Queue Worker — 7 Parallel Slots (BRAIN Concurrency Limit)
+# Background Queue Worker — 8 Parallel Slots (BRAIN Concurrency Limit)
 # -----------------------------------------------------------------------------
-MAX_CONCURRENT_SIMS = 7
+MAX_CONCURRENT_SIMS = 8
 
 # Shared cancel event — set to stop all in-flight simulations & drain queue
 cancel_event = threading.Event()
 
 # Per-slot live status tracking (slot_id -> dict)
-slot_status = {i: {"slot": i + 1, "status": "IDLE", "expression": None, "batch_id": None, "item_index": None, "start_time": None} for i in range(MAX_CONCURRENT_SIMS)}
+slot_status = {i: {"slot": i + 1, "status": "IDLE", "expression": None, "batch_id": None, "item_index": None, "start_time": None, "sim_id": None} for i in range(MAX_CONCURRENT_SIMS)}
 slot_lock = threading.Lock()
 
 def worker_slot(slot_id):
@@ -747,6 +840,93 @@ def login_auth():
         "persona_url": persona_url
     })
 
+@app.route("/api/auth/complete-persona", methods=["POST"])
+def complete_persona():
+    """
+    Called AFTER the user completes the face scan in the browser tab.
+    Per BRAIN Python SDK: POST to the API persona URL (api.worldquantbrain.com/authentication/persona?inquiry=...)
+    with the SAME session AND basic auth (email:password). Without basic auth you get 403.
+    """
+    email    = auth_state.get("pending_email") or ""
+    password = auth_state.get("pending_password") or ""
+
+    # Use the stored API URL (not the browser display URL)
+    api_url = auth_state.get("pending_api_persona_url") or ""
+
+    # Fallback: reconstruct from the browser URL if we only have that
+    if not api_url:
+        browser_url = auth_state.get("pending_persona_url") or ""
+        if "inquiry=" in browser_url:
+            inquiry_id = browser_url.split("inquiry=")[-1].split("&")[0]
+            api_url = f"https://api.worldquantbrain.com/authentication/persona?inquiry={inquiry_id}"
+
+    if not api_url:
+        return jsonify({"success": False, "message": "No pending face verification. Please log in first."}), 400
+    if not email or not password:
+        return jsonify({"success": False, "message": "No saved credentials. Please enter email and password again."}), 400
+
+    session = get_brain_session()
+    try:
+        print(f"[PERSONA] POSTing to API URL: {api_url}")
+        # *** CRITICAL: must include basic auth (email:password) — per BRAIN Python SDK ***
+        resp = session.post(api_url, auth=(email, password), timeout=30)
+        print(f"[PERSONA] Response: HTTP {resp.status_code} — {resp.text[:200]}")
+
+        if resp.status_code in [200, 201]:
+            # Grab JWT from response cookies or Set-Cookie header
+            cookie_parts = [f"{k}={v}" for k, v in resp.cookies.items()]
+            if not cookie_parts:
+                set_cookie = resp.headers.get("Set-Cookie", "")
+                for seg in set_cookie.split(","):
+                    seg = seg.strip()
+                    if seg.startswith("t="):
+                        cookie_parts.append(seg.split(";")[0].strip())
+                        break
+
+            if cookie_parts:
+                cookie_str = "; ".join(cookie_parts)
+                auth_state["cookie"] = cookie_str
+                _apply_session_cookie(cookie_str)
+
+            auth_state["authenticated"] = True
+            auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
+            auth_state["pending_persona_url"] = None
+            auth_state["pending_api_persona_url"] = None
+
+            try:
+                body = resp.json()
+                uid = (body.get("user") or {}).get("id") or body.get("email")
+                if uid:
+                    auth_state["user_email"] = uid
+            except Exception:
+                pass
+
+            save_auth_credentials(email, password)
+            print(f"[PERSONA] ✅ Face verification complete. Authenticated as {auth_state['user_email']}")
+            return jsonify({"success": True, "message": "Face verification complete!", "user_email": auth_state["user_email"]})
+
+        elif resp.status_code == 401:
+            # Face scan done but credentials wrong — shouldn't happen
+            return jsonify({"success": False, "message": "Credentials rejected (401). Check email/password."}), 401
+
+        elif resp.status_code == 403:
+            # 403 = face scan not yet completed in the browser
+            return jsonify({"success": False, "message": "Face scan not completed yet (403). Please finish the scan in the browser tab first, then click Verify."}), 403
+
+        elif resp.status_code == 409:
+            # 409 = inquiry already used — re-try full login
+            ok, msg, inq, purl = authenticate_brain_user(email, password)
+            if ok:
+                return jsonify({"success": True, "message": "Authenticated.", "user_email": auth_state["user_email"]})
+            return jsonify({"success": False, "message": f"Session conflict (409). Try logging in again. {msg}"})
+
+        else:
+            return jsonify({"success": False, "message": f"Unexpected response from BRAIN: HTTP {resp.status_code} — {resp.text[:200]}"}), 400
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error completing face verification: {str(e)}"}), 500
+
+
 def clean_single_expression(expr_str):
     if not expr_str:
         return ""
@@ -875,7 +1055,69 @@ def cancel_batch():
     # 5. Clear cancel flag so new batches can run
     cancel_event.clear()
 
-    return jsonify({"success": True, "message": f"Cancelled queue and stopped all {cancelled_count} pending jobs. All 7 slots now idle."})
+    return jsonify({"success": True, "message": f"Cancelled queue and stopped all {cancelled_count} pending jobs. All 8 slots now idle."})
+
+@app.route("/api/simulations/cancel/item", methods=["POST"])
+def cancel_single_item():
+    """Cancel a single queued item by batch_id + item_index."""
+    data = request.get_json() or {}
+    batch_id = data.get("batch_id")
+    item_index = data.get("item_index")
+    if batch_id is None or item_index is None:
+        return jsonify({"success": False, "error": "batch_id and item_index required"}), 400
+    item_index = int(item_index)
+    with jobs_lock:
+        if batch_id not in batch_jobs:
+            return jsonify({"success": False, "error": "Batch not found"}), 404
+        items = batch_jobs[batch_id].get("items", [])
+        if item_index >= len(items):
+            return jsonify({"success": False, "error": "Item index out of range"}), 400
+        item = items[item_index]
+        if item["status"] in ["QUEUED", "SIMULATING"]:
+            item["status"] = "CANCELLED"
+            batch_jobs[batch_id]["completed"] += 1
+            total = batch_jobs[batch_id]["total"]
+            completed = batch_jobs[batch_id]["completed"]
+            batch_jobs[batch_id]["progress"] = round((completed / total) * 100, 1)
+            if completed == total:
+                batch_jobs[batch_id]["status"] = "CANCELLED"
+            return jsonify({"success": True, "message": f"Item {item_index} in batch {batch_id} cancelled."})
+        return jsonify({"success": False, "error": f"Item status is {item['status']}, cannot cancel"}), 400
+
+
+@app.route("/api/settings/options", methods=["GET"])
+def get_settings_options():
+    """Return all available dropdown options for frontend settings."""
+    return jsonify({
+        "regions": ["USA", "GLB", "EUR", "ASI", "CHN", "KOR", "HKG", "IND", "DEU", "GBR"],
+        "universes": ["TOP3000", "MINVOL1M", "MINVOL10M", "TOPDIV3000", "TOP2000", "TOP1000", "TOP500", "TOP200"],
+        "neutralizations": [
+            {"value": "NONE", "label": "None"},
+            {"value": "RAM", "label": "RAM"},
+            {"value": "STATISTICAL", "label": "Statistical"},
+            {"value": "CROWDING", "label": "Crowding Factors"},
+            {"value": "FAST", "label": "Fast Factors"},
+            {"value": "SLOW", "label": "Slow Factors"},
+            {"value": "MARKET", "label": "Market"},
+            {"value": "SECTOR", "label": "Sector"},
+            {"value": "INDUSTRY", "label": "Industry"},
+            {"value": "SUBINDUSTRY", "label": "Subindustry"},
+            {"value": "COUNTRY", "label": "Country / Region"},
+            {"value": "SLOW_FAST", "label": "Slow + Fast Factors"}
+        ],
+        "delays": [0, 1],
+        "languages": [
+            {"value": "FASTEXPR", "label": "Fast Expression"},
+            {"value": "PYTHON", "label": "Python"}
+        ],
+        "instrumentTypes": ["EQUITY"],
+        "pasteurizations": ["ON", "OFF"],
+        "nanHandlings": ["OFF", "ON"],
+        "unitHandlings": ["VERIFY", "OFF"],
+        "maxTrades": ["OFF", "ON"],
+        "maxPositions": ["OFF", "ON"]
+    })
+
 
 @app.route("/api/simulations/slots", methods=["GET"])
 def get_slots():

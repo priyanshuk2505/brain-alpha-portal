@@ -1,459 +1,487 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorldQuant BRAIN Batch Alpha Portal</title>
-    <!-- Google Fonts & FontAwesome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js & Persona SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.withpersona.com/dist/persona-v4.9.0.js"></script>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorldQuant BRAIN Alpha Portal</title>
+  <meta name="description" content="Batch alpha simulation engine for WorldQuant BRAIN — 8 simultaneous simulations, real-time results, pass/fail matrix.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.withpersona.com/dist/persona-v4.9.0.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="dark-theme">
-    <!-- Top Navigation Bar -->
-    <header class="top-navbar">
-        <div class="brand-container">
-            <div class="brand-logo">
-                <i class="fa-solid fa-bolt-lightning text-gradient"></i>
-            </div>
-            <div class="brand-text">
-                <h1>BRAIN Alpha Portal</h1>
-                <span class="subtext">Batch Simulation Engine & Analytics Dashboard</span>
-            </div>
-        </div>
+<body>
 
-        <div class="nav-actions">
-            <div id="authStatusBadge" class="status-pill status-loading">
-                <span class="dot"></span>
-                <span class="status-label">Checking Auth...</span>
+<!-- ═══════════════════════════════════════════════ LOGIN OVERLAY ═══════ -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-bg-grid"></div>
+  <div class="login-orb login-orb-1"></div>
+  <div class="login-orb login-orb-2"></div>
+  <div class="login-card" id="loginCard">
+    <div class="login-logo">
+      <div class="login-logo-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
+      <div>
+        <h1 class="login-title">BRAIN Alpha Portal</h1>
+        <p class="login-subtitle">WorldQuant Simulation Engine</p>
+      </div>
+    </div>
+
+    <!-- Step 1: Credentials -->
+    <div id="loginStepCredentials" class="login-step active">
+      <div class="form-group">
+        <label class="field-label"><i class="fa-solid fa-envelope"></i> WorldQuant BRAIN Email</label>
+        <input type="email" id="loginEmail" class="field-input" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="field-label"><i class="fa-solid fa-lock"></i> Password</label>
+        <div class="password-wrap">
+          <input type="password" id="loginPassword" class="field-input" placeholder="Your BRAIN account password" autocomplete="current-password">
+          <button class="pass-toggle" id="passToggle" type="button"><i class="fa-solid fa-eye"></i></button>
+        </div>
+      </div>
+      <div id="loginError" class="login-error" style="display:none;"></div>
+      <button id="loginBtn" class="btn-login">
+        <span class="btn-login-text"><i class="fa-solid fa-right-to-bracket"></i> Sign In to BRAIN</span>
+        <span class="btn-login-loading" style="display:none;"><i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...</span>
+      </button>
+      <div class="login-divider"><span>or use saved session</span></div>
+      <button id="loginCookieToggle" class="btn-secondary-sm"><i class="fa-solid fa-cookie"></i> Paste Session Cookie / JWT</button>
+      <div id="cookiePasteArea" style="display:none;" class="form-group mt-12">
+        <textarea id="cookiePasteInput" class="field-input code-small" placeholder="Paste t=eyJ0eX... or full cookie string here"></textarea>
+        <button id="cookieSaveBtn" class="btn-secondary-sm mt-8"><i class="fa-solid fa-check"></i> Save & Verify Cookie</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Face ID -->
+    <div id="loginStepFaceId" class="login-step">
+      <div class="faceid-box">
+        <div class="faceid-icon-wrap">
+          <i class="fa-solid fa-face-smile faceid-icon"></i>
+          <div class="faceid-ring"></div>
+        </div>
+        <h3 class="faceid-title">Face Verification Required</h3>
+        <p class="faceid-desc">WorldQuant BRAIN requires Face ID before granting access. Complete the scan in the tab that opens.</p>
+        <div class="faceid-steps">
+          <div class="faceid-step"><span class="step-num">1</span> Click <strong>Open Face Scan</strong> — WorldQuant camera opens in a new tab</div>
+          <div class="faceid-step"><span class="step-num">2</span> Allow camera access and complete the face scan</div>
+          <div class="faceid-step"><span class="step-num">3</span> Return here and click <strong>Done — Verify Session</strong></div>
+        </div>
+        <button id="openFaceScanBtn" class="btn-faceid">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Face Scan
+        </button>
+        <button id="verifyFaceBtn" class="btn-secondary-sm mt-10">
+          <i class="fa-solid fa-circle-check"></i> Done — Verify Session
+        </button>
+        <button id="backToLoginBtn" class="btn-ghost mt-6">← Back to Login</button>
+        <div id="faceVerifyStatus" class="faceid-status" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ MAIN APP ═══════════ -->
+<div id="mainApp" class="main-app" style="display:none;">
+
+  <!-- TOP NAV -->
+  <header class="topnav">
+    <div class="topnav-brand">
+      <div class="brand-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
+      <div>
+        <span class="brand-name">BRAIN Alpha Portal</span>
+        <span class="brand-tagline">Batch Simulation Engine</span>
+      </div>
+    </div>
+    <div class="topnav-center">
+      <div class="ratelimit-display">
+        <i class="fa-solid fa-gauge-high"></i>
+        <span id="rlRemaining">— </span> sims remaining today
+        <span id="rlReset" class="rl-reset"></span>
+      </div>
+    </div>
+    <div class="topnav-actions">
+      <div id="authBadge" class="auth-badge auth-badge-ok">
+        <span class="auth-dot"></span>
+        <span id="authBadgeLabel">Authenticated</span>
+      </div>
+      <button id="openSettingsCredBtn" class="nav-btn"><i class="fa-solid fa-key"></i></button>
+      <button id="globalCancelBtn" class="nav-btn nav-btn-danger" title="Cancel All Simulations">
+        <i class="fa-solid fa-circle-stop"></i> Cancel All
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div class="app-layout">
+
+    <!-- ─── LEFT SIDEBAR: Input + Settings ─── -->
+    <aside class="sidebar">
+      <div class="sidebar-inner">
+
+        <!-- Alpha Input -->
+        <div class="panel-section">
+          <div class="panel-header">
+            <span class="panel-title"><i class="fa-solid fa-terminal"></i> Alpha Expressions</span>
+            <span class="badge-pill">FASTEXPR / PY</span>
+          </div>
+          <div class="tab-bar">
+            <button class="tab active" data-tab="tabEditor">Editor</button>
+            <button class="tab" data-tab="tabPresets">Presets</button>
+            <button class="tab" data-tab="tabUpload">Upload</button>
+          </div>
+
+          <div id="tabEditor" class="tab-pane active">
+            <textarea id="alphaInput" class="code-editor" placeholder="Enter alpha expressions — one per line:
+
+normalize(ts_decay_linear(zscore(group_neutralize(
+  rank(ts_delta(rank(returns), 3)) * rank(adv20), market)), 3))
+
+rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
+            <div class="input-meta">
+              <span id="exprCount" class="expr-count">0 expressions</span>
+              <button id="clearEditorBtn" class="btn-ghost-sm"><i class="fa-solid fa-eraser"></i> Clear</button>
             </div>
-            <button id="openCookieModalBtn" class="btn btn-secondary btn-sm">
-                <i class="fa-solid fa-key"></i> Session Credentials
+          </div>
+
+          <div id="tabPresets" class="tab-pane">
+            <select id="presetSelect" class="field-select">
+              <option value="momentum">Momentum Signals</option>
+              <option value="reversion">Short-Term Reversion</option>
+              <option value="volatility">Volatility Adjusted</option>
+              <option value="liquidity">Liquidity Rank</option>
+            </select>
+            <button id="insertPresetBtn" class="btn-secondary mt-8">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Insert Preset
             </button>
+          </div>
+
+          <div id="tabUpload" class="tab-pane">
+            <div class="dropzone" id="dropzone">
+              <i class="fa-solid fa-cloud-arrow-up dropzone-icon"></i>
+              <p>Drag & Drop <code>.csv</code> or <code>.txt</code></p>
+              <span>or click to browse</span>
+              <input type="file" id="fileInput" accept=".csv,.txt" hidden>
+            </div>
+          </div>
         </div>
-    </header>
 
-    <!-- Main Workspace Container -->
-    <main class="portal-container">
-        <!-- Sidebar Input & Settings Panel -->
-        <aside class="sidebar-panel">
-            <div class="card glass-card">
-                <div class="card-header">
-                    <h2><i class="fa-solid fa-terminal"></i> Batch Input & Config</h2>
-                    <span class="badge badge-purple">FASTEXPR / PYTHON</span>
-                </div>
+        <!-- Settings Panel -->
+        <div class="panel-section">
+          <div class="panel-header">
+            <span class="panel-title"><i class="fa-solid fa-sliders"></i> Simulation Settings</span>
+            <button id="saveDefaultsBtn" class="btn-ghost-sm"><i class="fa-solid fa-floppy-disk"></i> Save as Default</button>
+          </div>
 
-                <!-- Input Mode Switcher -->
-                <div class="tab-group">
-                    <button class="tab-btn active" data-tab="editorTab">Editor</button>
-                    <button class="tab-btn" data-tab="presetsTab">Presets</button>
-                    <button class="tab-btn" data-tab="fileTab">Upload</button>
-                </div>
+          <div class="settings-grid">
 
-                <!-- Editor Tab -->
-                <div id="editorTab" class="tab-content active">
-                    <div class="form-group">
-                        <label for="batchInput">Alpha Expressions (One per line or JSON Array)</label>
-                        <textarea id="batchInput" class="code-editor" placeholder="Enter alpha expressions here...
-Example:
-normalize(ts_decay_linear(zscore(group_neutralize((rank(ts_delta(rank(returns), 3)) * rank(ts_delta(rank(volume), 3))) * rank(adv20) * 1), market)), 3))
-normalize(ts_decay_linear(zscore(group_neutralize(((rank(rank(nws18_bee_fast_d1) - rank(adv20))) * rank(adv20) * -1), market)), 5))"></textarea>
-                    </div>
-                </div>
-
-                <!-- Presets Tab -->
-                <div id="presetsTab" class="tab-content">
-                    <div class="form-group">
-                        <label>Select Preset Alpha Strategy Template</label>
-                        <select id="presetSelect" class="form-control">
-                            <option value="acceleration">Volume-Weighted Trend Acceleration</option>
-                            <option value="convergence">Liquidity Rank Convergence</option>
-                            <option value="volatility">Volatility Adjusted Momentum</option>
-                            <option value="reversion">Short-Term Reversion</option>
-                        </select>
-                    </div>
-                    <button id="applyPresetBtn" class="btn btn-secondary btn-block">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Insert Selected Preset
-                    </button>
-                </div>
-
-                <!-- File Upload Tab -->
-                <div id="fileTab" class="tab-content">
-                    <div class="file-dropzone" id="fileDropzone">
-                        <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
-                        <p>Drag & Drop <code>.csv</code> or <code>.txt</code> file here</p>
-                        <span class="sub-text">or click to browse</span>
-                        <input type="file" id="fileInput" accept=".csv,.txt" hidden>
-                    </div>
-                </div>
-
-                <!-- Simulation Settings -->
-                <div class="card-header border-top">
-                    <h3><i class="fa-solid fa-sliders"></i> Simulation Settings</h3>
-                </div>
-
-                <div class="settings-grid">
-                    <div class="form-group">
-                        <label>Region</label>
-                        <select id="settingRegion" class="form-control">
-                            <option value="USA" selected>USA (United States)</option>
-                            <option value="GLB">GLB (Global)</option>
-                            <option value="EUR">EUR (Europe)</option>
-                            <option value="ASI">ASI (Asia-Pacific)</option>
-                            <option value="CHN">CHN (China)</option>
-                            <option value="KOR">KOR (South Korea)</option>
-                            <option value="HKG">HKG (Hong Kong)</option>
-                            <option value="IND">IND (India)</option>
-                            <option value="DEU">DEU (Germany)</option>
-                            <option value="GBR">GBR (United Kingdom)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Universe</label>
-                        <select id="settingUniverse" class="form-control">
-                            <option value="TOP3000" selected>TOP3000</option>
-                            <option value="TOP2000">TOP2000</option>
-                            <option value="TOP1000">TOP1000</option>
-                            <option value="TOP500">TOP500</option>
-                            <option value="TOP200">TOP200</option>
-                            <option value="ILLIQUID_MINVOL1M">ILLIQUID_MINVOL1M</option>
-                            <option value="TOPSP500">TOPSP500</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Neutralization</label>
-                        <select id="settingNeutralization" class="form-control">
-                            <option value="INDUSTRY" selected>Industry</option>
-                            <option value="SUBINDUSTRY">Subindustry</option>
-                            <option value="SECTOR">Sector</option>
-                            <option value="MARKET">Market</option>
-                            <option value="NONE">None</option>
-                            <option value="RAM">RAM</option>
-                            <option value="STATISTICAL">Statistical</option>
-                            <option value="CROWDING">Crowding Factors</option>
-                            <option value="FAST">Fast Factors</option>
-                            <option value="SLOW">Slow Factors</option>
-                            <option value="SLOW_FAST">Slow + Fast Factors</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Delay</label>
-                        <select id="settingDelay" class="form-control">
-                            <option value="1" selected>1 (Next Day)</option>
-                            <option value="0">0 (Same Day)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Decay</label>
-                        <select id="settingDecay" class="form-control">
-                            <option value="2" selected>2</option>
-                            <option value="0">0</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="8">8</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                            <option value="20">20</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Truncation</label>
-                        <input type="number" id="settingTruncation" class="form-control" value="0.08" step="0.01" min="0.01" max="0.5">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Pasteurization</label>
-                        <select id="settingPasteurization" class="form-control">
-                            <option value="ON" selected>ON</option>
-                            <option value="OFF">OFF</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>NaN Handling</label>
-                        <select id="settingNanHandling" class="form-control">
-                            <option value="ON" selected>ON</option>
-                            <option value="OFF">OFF</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Unit Handling</label>
-                        <select id="settingUnitHandling" class="form-control">
-                            <option value="VERIFY" selected>VERIFY</option>
-                            <option value="OFF">OFF</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Language</label>
-                        <select id="settingLanguage" class="form-control">
-                            <option value="FASTEXPR" selected>FASTEXPR</option>
-                            <option value="PYTHON">PYTHON</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-checkbox-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="settingDryRun">
-                        <span class="checkmark"></span>
-                        Dry-Run Offline Mode (Mock API)
-                    </label>
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="settingAutoSubmit">
-                        <span class="checkmark"></span>
-                        Auto-Submit to BRAIN (Sharpe ≥ 0.5)
-                    </label>
-                </div>
-
-                <!-- Launch Actions -->
-                <div class="button-group">
-                    <button id="launchBatchBtn" class="btn btn-primary btn-glow">
-                        <i class="fa-solid fa-play"></i> Launch Batch Simulation
-                    </button>
-                    <button id="clearInputBtn" class="btn btn-secondary">
-                        <i class="fa-solid fa-eraser"></i> Clear
-                    </button>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Dashboard View Area -->
-        <section class="dashboard-panel">
-            <!-- Active Jobs Queue Panel -->
-            <div class="card glass-card">
-                <div class="card-header flex-wrap">
-                    <div class="header-title-group">
-                        <h2><i class="fa-solid fa-list-check"></i> Active Batch Queue</h2>
-                        <span id="queueStatsBadge" class="badge badge-blue">0 Jobs Queued</span>
-                    </div>
-                    <button id="cancelBatchBtn" class="btn btn-danger btn-sm">
-                        <i class="fa-solid fa-circle-stop"></i> Stop & Cancel Batch
-                    </button>
-                </div>
-
-                <div id="activeQueueContainer" class="queue-container">
-                    <div class="empty-state">
-                        <i class="fa-solid fa-layer-group empty-icon"></i>
-                        <p>No active batch simulation running.</p>
-                        <span class="sub-text">Enter expressions on the left and click "Launch Batch Simulation"</span>
-                    </div>
-                </div>
+            <div class="setting-row full">
+              <label class="setting-label">LANGUAGE <i class="fa-solid fa-circle-info info-tip" title="Expression language"></i></label>
+              <select id="sLang" class="field-select">
+                <option value="FASTEXPR">Fast Expression</option>
+                <option value="PYTHON">Python</option>
+              </select>
             </div>
 
-            <!-- Historical & Batch Results Explorer -->
-            <div class="card glass-card margin-top">
-                <div class="card-header flex-wrap">
-                    <div class="header-title-group">
-                        <h2><i class="fa-solid fa-chart-line"></i> Results Explorer</h2>
-                        <span id="resultsCountBadge" class="badge badge-purple">0 Alphas</span>
-                    </div>
-                    
-                    <div class="filter-controls">
-                        <div class="search-box">
-                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                            <input type="text" id="searchInput" placeholder="Search code, settings, ID...">
-                        </div>
-
-                        <select id="filterStatus" class="form-control filter-dropdown">
-                            <option value="ALL">All Statuses</option>
-                            <option value="SUCCESS">SUCCESS Only</option>
-                            <option value="CACHED_DUPLICATE">CACHED DUPLICATE</option>
-                            <option value="FAILED">FAILED Only</option>
-                        </select>
-
-                        <select id="filterUniverse" class="form-control filter-dropdown">
-                            <option value="ALL">All Universes</option>
-                            <option value="TOP3000">TOP3000</option>
-                            <option value="TOP2000">TOP2000</option>
-                            <option value="TOP1000">TOP1000</option>
-                            <option value="TOP500">TOP500</option>
-                            <option value="TOP200">TOP200</option>
-                            <option value="TOP100">TOP100</option>
-                            <option value="ILLIQUID">ILLIQUID</option>
-                        </select>
-
-                        <select id="filterNeutralization" class="form-control filter-dropdown">
-                            <option value="ALL">All Neutralizations</option>
-                            <option value="INDUSTRY">INDUSTRY</option>
-                            <option value="SUBINDUSTRY">SUBINDUSTRY</option>
-                            <option value="SECTOR">SECTOR</option>
-                            <option value="MARKET">MARKET</option>
-                            <option value="STATBND">STATBND</option>
-                            <option value="NONE">NONE</option>
-                        </select>
-
-                        <select id="filterSharpe" class="form-control filter-dropdown">
-                            <option value="ALL">All Sharpe Ratios</option>
-                            <option value="1.25">Sharpe ≥ 1.25 (Elite)</option>
-                            <option value="1.0">Sharpe ≥ 1.0 (High)</option>
-                            <option value="0.5">Sharpe ≥ 0.5 (Submittable)</option>
-                            <option value="0.0">Sharpe > 0 (Positive)</option>
-                        </select>
-
-                        <div class="btn-group-sm">
-                            <button id="toggleEliteBtn" class="btn btn-warning btn-sm" title="Show only Elite Alphas (Sharpe >= 1.25)">
-                                <i class="fa-solid fa-star"></i> Elite Alphas Only
-                            </button>
-                            <button id="exportCsvBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
-                            <button id="exportEliteBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-download"></i> Download Elite .txt</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Results Table -->
-                <div class="table-responsive">
-                    <table class="data-table" id="resultsTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 30px;"></th>
-                                <th data-sort="status">Status <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="sharpe">Sharpe <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="fitness">Fitness <i class="fa-sort"></i></th>
-                                <th data-sort="returns">Returns % <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="drawdown">Drawdown % <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="margin">Margin (bps) <i class="fa-solid fa-sort"></i></th>
-                                <th data-sort="turnover">Turnover % <i class="fa-sort"></i></th>
-                                <th data-sort="universe">Universe</th>
-                                <th data-sort="delay">Delay</th>
-                                <th>Expression Code</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsTableBody">
-                            <tr>
-                                <td colspan="12" class="text-center">Loading simulation results...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="setting-row full">
+              <label class="setting-label">INSTRUMENT TYPE <i class="fa-solid fa-circle-info info-tip"></i></label>
+              <select id="sInstrument" class="field-select">
+                <option value="EQUITY">Equity</option>
+              </select>
             </div>
-        </section>
+
+            <div class="setting-row">
+              <label class="setting-label">REGION <i class="fa-solid fa-circle-info info-tip" title="Simulation region"></i></label>
+              <select id="sRegion" class="field-select">
+                <option value="USA">USA</option>
+                <option value="GLB">GLB</option>
+                <option value="EUR">EUR</option>
+                <option value="ASI">ASI</option>
+                <option value="CHN">CHN</option>
+                <option value="KOR">KOR</option>
+                <option value="HKG">HKG</option>
+                <option value="IND">IND</option>
+                <option value="DEU">DEU</option>
+                <option value="GBR">GBR</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">DELAY <i class="fa-solid fa-circle-info info-tip" title="0=same day, 1=next day"></i></label>
+              <select id="sDelay" class="field-select">
+                <option value="1" selected>1</option>
+                <option value="0">0</option>
+              </select>
+            </div>
+
+            <div class="setting-row full">
+              <label class="setting-label">UNIVERSE <i class="fa-solid fa-circle-info info-tip" title="Instrument universe"></i></label>
+              <select id="sUniverse" class="field-select">
+                <option value="TOP3000">TOP3000</option>
+                <option value="MINVOL1M">MINVOL1M</option>
+                <option value="MINVOL10M">MINVOL10M</option>
+                <option value="TOPDIV3000">TOPDIV3000</option>
+                <option value="TOP2000">TOP2000</option>
+                <option value="TOP1000">TOP1000</option>
+                <option value="TOP500">TOP500</option>
+                <option value="TOP200">TOP200</option>
+              </select>
+            </div>
+
+            <div class="setting-row full">
+              <label class="setting-label">NEUTRALIZATION <i class="fa-solid fa-circle-info info-tip" title="Portfolio neutralization method"></i></label>
+              <select id="sNeutralization" class="field-select">
+                <option value="NONE">None</option>
+                <option value="RAM">RAM</option>
+                <option value="STATISTICAL">Statistical</option>
+                <option value="CROWDING">Crowding Factors</option>
+                <option value="FAST">Fast Factors</option>
+                <option value="SLOW">Slow Factors</option>
+                <option value="MARKET">Market</option>
+                <option value="SECTOR">Sector</option>
+                <option value="INDUSTRY" selected>Industry</option>
+                <option value="SUBINDUSTRY">Subindustry</option>
+                <option value="COUNTRY">Country / Region</option>
+                <option value="SLOW_FAST">Slow + Fast Factors</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">DECAY <i class="fa-solid fa-circle-info info-tip" title="Exponential decay parameter"></i></label>
+              <input type="number" id="sDecay" class="field-input num-input" value="7" min="0" max="30" step="1">
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">TRUNCATION <i class="fa-solid fa-circle-info info-tip" title="Max position weight"></i></label>
+              <input type="number" id="sTruncation" class="field-input num-input" value="0.07" min="0.01" max="0.50" step="0.01">
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">PASTEURIZATION <i class="fa-solid fa-circle-info info-tip"></i></label>
+              <select id="sPasteurization" class="field-select">
+                <option value="ON" selected>On</option>
+                <option value="OFF">Off</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">UNIT HANDLING <i class="fa-solid fa-circle-info info-tip"></i></label>
+              <select id="sUnitHandling" class="field-select">
+                <option value="VERIFY" selected>Verify</option>
+                <option value="OFF">Off</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">NAN HANDLING <i class="fa-solid fa-circle-info info-tip"></i></label>
+              <select id="sNanHandling" class="field-select">
+                <option value="OFF" selected>Off</option>
+                <option value="ON">On</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">TEST PERIOD <i class="fa-solid fa-circle-info info-tip" title="Backtest out-of-sample period"></i></label>
+              <div class="period-row">
+                <input type="number" id="sPeriodYears" class="field-input num-input" value="0" min="0" max="5" step="1">
+                <span class="period-unit">YRS</span>
+                <input type="number" id="sPeriodMonths" class="field-input num-input" value="0" min="0" max="11" step="1">
+                <span class="period-unit">MO</span>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">MAX TRADE <i class="fa-solid fa-circle-info info-tip"></i></label>
+              <select id="sMaxTrade" class="field-select">
+                <option value="OFF" selected>Off</option>
+                <option value="ON">On</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">MAX POSITION <i class="fa-solid fa-circle-info info-tip"></i></label>
+              <select id="sMaxPosition" class="field-select">
+                <option value="OFF" selected>Off</option>
+                <option value="ON">On</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="sDryRun" class="toggle-checkbox">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              Dry-Run (Mock API)
+            </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="sAutoSubmit" class="toggle-checkbox">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              Auto-Submit (Sharpe ≥ 0.5)
+            </label>
+          </div>
+        </div>
+
+        <!-- Launch -->
+        <div class="launch-actions">
+          <button id="launchBtn" class="btn-launch">
+            <i class="fa-solid fa-play"></i> Launch Simulation
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ─── MAIN CONTENT ─── -->
+    <main class="main-content">
+
+      <!-- 8-Slot Simulation Queue -->
+      <div class="content-card">
+        <div class="content-card-header">
+          <div class="header-left">
+            <h2 class="content-card-title"><i class="fa-solid fa-microchip"></i> Simulation Queue</h2>
+            <span id="queueBadge" class="badge-pill badge-blue">8 slots ready</span>
+          </div>
+          <div class="header-right">
+            <span id="dailyStats" class="daily-stats"></span>
+          </div>
+        </div>
+        <div id="slotGrid" class="slot-grid">
+          <!-- 8 slots rendered by JS -->
+        </div>
+
+        <!-- Batch progress bars -->
+        <div id="batchProgressArea" class="batch-progress-area" style="display:none;">
+          <div class="batch-progress-header">
+            <span class="batch-progress-title"><i class="fa-solid fa-bars-progress"></i> Batch Progress</span>
+            <span id="batchProgressLabel" class="batch-progress-label"></span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div id="batchProgressBar" class="progress-bar-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pass / Fail Matrix -->
+      <div class="content-card" id="matrixCard" style="display:none;">
+        <div class="content-card-header">
+          <h2 class="content-card-title"><i class="fa-solid fa-table-cells"></i> Pass / Fail Matrix</h2>
+          <span id="matrixSubtitle" class="badge-pill badge-purple"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="matrix-table" id="matrixTable">
+            <thead id="matrixHead"></thead>
+            <tbody id="matrixBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Results Explorer -->
+      <div class="content-card">
+        <div class="content-card-header">
+          <div class="header-left">
+            <h2 class="content-card-title"><i class="fa-solid fa-chart-line"></i> Results Explorer</h2>
+            <span id="resultsCountBadge" class="badge-pill badge-purple">0 alphas</span>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="searchInput" placeholder="Search expression, ID, universe..." class="search-input">
+          </div>
+          <select id="filterStatus" class="field-select filter-select">
+            <option value="ALL">All Statuses</option>
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="CACHED_DUPLICATE">CACHED</option>
+            <option value="FAILED">FAILED</option>
+          </select>
+          <select id="filterUniverse" class="field-select filter-select">
+            <option value="ALL">All Universes</option>
+            <option value="TOP3000">TOP3000</option>
+            <option value="MINVOL1M">MINVOL1M</option>
+            <option value="MINVOL10M">MINVOL10M</option>
+            <option value="TOPDIV3000">TOPDIV3000</option>
+            <option value="TOP2000">TOP2000</option>
+            <option value="TOP1000">TOP1000</option>
+            <option value="TOP500">TOP500</option>
+          </select>
+          <select id="filterSharpe" class="field-select filter-select">
+            <option value="ALL">All Sharpe</option>
+            <option value="1.25">≥ 1.25 Elite</option>
+            <option value="1.0">≥ 1.0 High</option>
+            <option value="0.5">≥ 0.5 Submit</option>
+          </select>
+          <button id="eliteOnlyBtn" class="btn-filter"><i class="fa-solid fa-star"></i> Elite Only</button>
+          <button id="exportCsvBtn" class="btn-filter"><i class="fa-solid fa-file-csv"></i> CSV</button>
+          <button id="exportEliteBtn" class="btn-filter"><i class="fa-solid fa-download"></i> Elite</button>
+        </div>
+
+        <div class="table-scroll">
+          <table class="results-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th style="width:28px"></th>
+                <th data-sort="status">Status</th>
+                <th data-sort="sharpe">Sharpe <i class="fa-solid fa-sort sort-icon"></i></th>
+                <th data-sort="fitness">Fitness <i class="fa-solid fa-sort sort-icon"></i></th>
+                <th data-sort="returns">Returns% <i class="fa-solid fa-sort sort-icon"></i></th>
+                <th data-sort="drawdown">Drawdown% <i class="fa-solid fa-sort sort-icon"></i></th>
+                <th data-sort="margin">Margin(bps) <i class="fa-solid fa-sort sort-icon"></i></th>
+                <th data-sort="turnover">Turnover% <i class="fa-solid fa-sort sort-icon"></i></th>
+                <th>Universe</th>
+                <th>Region</th>
+                <th>Delay</th>
+                <th>Neutralization</th>
+                <th>Expression</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr><td colspan="14" class="empty-row">No simulation results yet. Launch a batch above.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </main>
+  </div><!-- end app-layout -->
+</div><!-- end main-app -->
 
-    <!-- Modal: PnL Chart & Alpha Details -->
-    <div id="pnlModal" class="modal">
-        <div class="modal-content glass-card modal-lg">
-            <div class="modal-header">
-                <h3 id="modalAlphaTitle"><i class="fa-solid fa-chart-area"></i> Alpha Performance & PnL</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="chart-container">
-                    <canvas id="pnlChartCanvas"></canvas>
-                </div>
-                <div id="modalAlphaDetails" class="alpha-details-grid"></div>
-            </div>
-        </div>
+<!-- ════════════ PnL CHART MODAL ════════ -->
+<div id="pnlModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h3 id="pnlModalTitle"><i class="fa-solid fa-chart-area"></i> PnL Chart</h3>
+      <button class="modal-close" data-close="pnlModal">×</button>
     </div>
-
-    <!-- Modal: Credentials & Authentication -->
-    <div id="cookieModal" class="modal">
-        <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-key"></i> WorldQuant BRAIN Authentication</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p class="sub-text">Authenticate your session to connect directly with <code>api.worldquantbrain.com</code>.</p>
-                
-                <!-- Auth Method Tabs -->
-                <div class="tab-group margin-top">
-                    <button class="tab-btn active" id="authEmailTabBtn" data-authtab="authEmailTab"><i class="fa-solid fa-envelope"></i> Email & Password</button>
-                    <button class="tab-btn" id="authBioTabBtn" data-authtab="authBioTab"><i class="fa-solid fa-fingerprint"></i> Biometric / Touch ID</button>
-                    <button class="tab-btn" id="authCookieTabBtn" data-authtab="authCookieTab"><i class="fa-solid fa-cookie"></i> Session Cookie</button>
-                </div>
-
-                <!-- Tab 1: Email & Password -->
-                <div id="authEmailTab" class="auth-tab-content active">
-                    <div class="form-group margin-top">
-                        <label for="loginEmailInput">WorldQuant BRAIN Email</label>
-                        <input type="email" id="loginEmailInput" class="form-control" placeholder="user@example.com" value="priyanshubhadani25@gmail.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="loginPasswordInput">BRAIN Password</label>
-                        <input type="password" id="loginPasswordInput" class="form-control" placeholder="Enter your BRAIN account password">
-                    </div>
-                    <button id="loginBrainBtn" class="btn btn-primary btn-block margin-top">
-                        <i class="fa-solid fa-right-to-bracket"></i> Log In & Authorize Session
-                    </button>
-
-                    <!-- Persona Face Verification Card -->
-                    <div id="personaContainer" class="card glass-card margin-top" style="display: none; border: 1px solid rgba(0, 242, 254, 0.4); background: rgba(15, 23, 42, 0.9); padding: 16px; border-radius: 10px;">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom: 12px;">
-                            <i class="fa-solid fa-camera" style="font-size: 1.6rem; background: linear-gradient(135deg,#00f2fe,#4facfe); -webkit-background-clip:text; -webkit-text-fill-color:transparent;"></i>
-                            <div>
-                                <h4 style="color:#38bdf8; font-weight:700; margin:0; font-size:0.95rem;">Face Login Verification Required</h4>
-                                <p style="color:#64748b; font-size:0.78rem; margin:2px 0 0;">WorldQuant BRAIN requires Face ID before granting access</p>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px; font-size:0.8rem; color:#94a3b8;">
-                            <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(56,189,248,0.07); border-radius:6px;">
-                                <span style="width:20px; height:20px; background:linear-gradient(135deg,#00f2fe,#4facfe); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#0f172a; flex-shrink:0;">1</span>
-                                Click <b style="color:#e2e8f0;">"Open Face Scan"</b> — opens WorldQuant camera page in a new tab
-                            </div>
-                            <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(56,189,248,0.07); border-radius:6px;">
-                                <span style="width:20px; height:20px; background:linear-gradient(135deg,#00f2fe,#4facfe); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#0f172a; flex-shrink:0;">2</span>
-                                Allow camera access and complete the face scan in that tab
-                            </div>
-                            <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(56,189,248,0.07); border-radius:6px;">
-                                <span style="width:20px; height:20px; background:linear-gradient(135deg,#00f2fe,#4facfe); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#0f172a; flex-shrink:0;">3</span>
-                                Come back here and click <b style="color:#e2e8f0;">"Done — Verify Session"</b>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; gap:8px; flex-direction: column;">
-                            <button id="launchPersonaBtn" class="btn btn-primary btn-glow btn-block" style="background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); font-weight: 700; letter-spacing:0.01em; padding: 11px;">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i>&nbsp; Open Face Scan (New Tab)
-                            </button>
-                            <button id="checkPersonaDoneBtn" class="btn btn-secondary btn-block" style="padding: 10px;">
-                                <i class="fa-solid fa-circle-check"></i>&nbsp; Done — Verify Session
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-
-                <!-- Tab 2: Biometric / Touch ID -->
-                <div id="authBioTab" class="auth-tab-content">
-                    <div class="biometric-box text-center margin-top">
-                        <i class="fa-solid fa-fingerprint biometric-icon"></i>
-                        <h4>Passkey / Biometric Authentication</h4>
-                        <p class="sub-text">Use your Mac Touch ID, Face ID, or Hardware Security Key for instant passwordless authentication.</p>
-                        <button id="biometricAuthBtn" class="btn btn-primary btn-block margin-top">
-                            <i class="fa-solid fa-fingerprint"></i> Authenticate with Touch ID / Passkey
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Tab 3: Manual Cookie -->
-                <div id="authCookieTab" class="auth-tab-content">
-                    <div class="form-group margin-top">
-                        <label for="cookieInput">Cookie Header String or JWT Token</label>
-                        <textarea id="cookieInput" class="code-editor small-editor" placeholder="Paste Cookie string or JWT token here (e.g. t=eyJ0eXAi...; _ga=...)"></textarea>
-                    </div>
-                    <button id="saveCookieBtn" class="btn btn-secondary btn-block">
-                        <i class="fa-solid fa-check"></i> Save & Validate Cookie
-                    </button>
-                </div>
-            </div>
-        </div>
+    <div class="modal-body">
+      <div class="chart-wrap"><canvas id="pnlCanvas"></canvas></div>
+      <div id="pnlMetaGrid" class="meta-grid"></div>
     </div>
+  </div>
+</div>
 
-    <script src="/static/app.js"></script>
+<!-- ════════════ SESSION MODAL ════════ -->
+<div id="sessionModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-key"></i> Session Credentials</h3>
+      <button class="modal-close" data-close="sessionModal">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Update your session cookie or JWT to reconnect without restarting.</p>
+      <div class="form-group mt-12">
+        <label class="field-label">Cookie / JWT Token</label>
+        <textarea id="sessionCookieInput" class="field-input code-small" placeholder="t=eyJ0eXAi... or paste full cookie string"></textarea>
+      </div>
+      <button id="sessionSaveBtn" class="btn-launch mt-10"><i class="fa-solid fa-check"></i> Save & Validate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="/static/app.js"></script>
 </body>
 </html>

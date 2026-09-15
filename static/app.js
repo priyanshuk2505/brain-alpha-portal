@@ -151,32 +151,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function launchEmbeddedPersona(inquiryId) {
-    if (window.Persona && window.Persona.Client) {
-      try {
-        toast('Launching Face Scan inline modal...', 'info');
-        const client = new Persona.Client({
-          inquiryId: inquiryId,
-          onComplete: async ({ inquiryId, status, fields }) => {
-            toast('Face scan complete! Finalizing session with BRAIN API...', 'info');
-            await performPersonaVerification();
-          },
-          onCancel: ({ inquiryId, sessionToken }) => {
-            toast('Face scan cancelled.', 'warning');
-            showLoginStep('loginStepFaceId');
-          },
-          onError: (error) => {
-            console.error('Persona SDK error:', error);
-            showLoginStep('loginStepFaceId');
-          }
-        });
-        client.open();
-        return true;
-      } catch (err) {
-        console.warn('Embedded Persona failed to open:', err);
-      }
+  function launchPersonaWindow(inquiryId) {
+    const url = `https://api.worldquantbrain.com/authentication/persona?inquiry=${inquiryId}`;
+    const popup = window.open(url, 'brain_face_scan', 'width=600,height=750,scrollbars=yes,resizable=yes');
+    if (popup) {
+      popup.focus();
+      toast('Face Scan window opened. Complete the camera scan to authenticate.', 'info');
+    } else {
+      toast('Popup blocked by browser. Click "Open Face Scan" to open manually.', 'warning');
     }
-    return false;
+    // Start auto-polling to detect when scan completes
+    pollPersonaAuth();
   }
 
   async function handleLogin() {
@@ -209,15 +194,16 @@ document.addEventListener('DOMContentLoaded', () => {
         state.personaUrl = data.persona_url;
         state.inquiryId = data.inquiry_id;
 
-        // Try launching inline embedded Persona face scan modal first!
-        const launched = data.inquiry_id && launchEmbeddedPersona(data.inquiry_id);
-        if (!launched) {
-          showLoginStep('loginStepFaceId');
-          const statusEl = document.getElementById('faceVerifyStatus');
-          if (statusEl) {
-            statusEl.textContent = 'Face scan URL ready. Open and complete it.';
-            statusEl.style.display = 'block';
-          }
+        showLoginStep('loginStepFaceId');
+        const statusEl = document.getElementById('faceVerifyStatus');
+        if (statusEl) {
+          statusEl.textContent = 'Face scan required. Complete the scan in the popup window.';
+          statusEl.style.display = 'block';
+        }
+
+        // Open standalone popup window (avoids iframe refused to connect!)
+        if (data.inquiry_id) {
+          launchPersonaWindow(data.inquiry_id);
         }
       } else {
         errEl.textContent = data.message || 'Authentication failed.';

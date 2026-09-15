@@ -391,6 +391,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global cancel
     document.getElementById('globalCancelBtn').addEventListener('click', handleGlobalCancel);
 
+    // Submitable Alphas button
+    const subBtn = document.getElementById('viewSubmitableBtn');
+    if (subBtn) subBtn.addEventListener('click', viewSubmitableReport);
+
+    // Download Batch CSV button
+    const csvBtn = document.getElementById('downloadBatchCsvBtn');
+    if (csvBtn) {
+      csvBtn.addEventListener('click', () => {
+        if (!state.currentBatch) { toast('No active batch to download.', 'warning'); return; }
+        window.open(`/api/simulations/batch/${state.currentBatch}/csv`, '_blank');
+      });
+    }
+
     // Open session modal
     document.getElementById('openSettingsCredBtn').addEventListener('click', () => {
       showModal('sessionModal');
@@ -656,7 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
           : batches.find(b => b.status === 'RUNNING');
 
         if (activeBatch) {
-          showBatchProgress(activeBatch.progress, activeBatch.total, activeBatch.completed);
+          showBatchProgress(activeBatch.progress, activeBatch.total, activeBatch.completed, activeBatch);
           updateQueueBadge(activeBatch);
 
           if (activeBatch.status === 'COMPLETED' || activeBatch.status === 'CANCELLED') {
@@ -794,14 +807,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function showBatchProgress(progress, total, completed) {
+  function showBatchProgress(progress, total, completed, batchData) {
     const area = document.getElementById('batchProgressArea');
-    area.style.display = 'block';
+    if (area) area.style.display = 'block';
     const pct = typeof progress === 'number' ? progress : 0;
     document.getElementById('batchProgressBar').style.width = `${pct}%`;
     const done = completed !== undefined ? completed : Math.floor((pct / 100) * total);
     document.getElementById('batchProgressLabel').textContent =
       `${done} / ${total} complete (${pct.toFixed(1)}%)`;
+
+    if (batchData) {
+      const startEl = document.getElementById('batchStartTime');
+      const endEl = document.getElementById('batchEndTime');
+      const durEl = document.getElementById('batchDuration');
+      if (batchData.created_at) {
+        const start = new Date(batchData.created_at);
+        if (startEl) startEl.textContent = start.toLocaleTimeString();
+        if (batchData.end_time) {
+          const end = new Date(batchData.end_time);
+          if (endEl) endEl.textContent = end.toLocaleTimeString();
+          const secs = Math.max(0, Math.floor((end - start) / 1000));
+          const mins = Math.floor(secs / 60);
+          if (durEl) durEl.textContent = `${mins}m ${secs % 60}s`;
+        } else {
+          if (endEl) endEl.textContent = 'Running...';
+          const secs = Math.max(0, Math.floor((Date.now() - start) / 1000));
+          const mins = Math.floor(secs / 60);
+          if (durEl) durEl.textContent = `${mins}m ${secs % 60}s`;
+        }
+      }
+    }
   }
 
   function hideBatchProgress() {
@@ -1173,6 +1208,21 @@ document.addEventListener('DOMContentLoaded', () => {
       toast(`Error fetching report: ${err.message}`, 'error');
     }
   };
+
+  async function viewSubmitableReport() {
+    try {
+      const resp = await fetch('/api/reports/submitable');
+      const data = await resp.json();
+      if (!data.exists || !data.count) {
+        toast('No submitable alphas saved yet.', 'warning');
+        return;
+      }
+      alert(`🚀 Submitable Alphas (Count: ${data.count}):\n\n${data.content.substring(0, 1500)}${data.content.length > 1500 ? '\n... (see submitable_alphas.txt & submitable_alphas.csv)' : ''}`);
+    } catch (err) {
+      toast(`Error fetching submitable report: ${err.message}`, 'error');
+    }
+  }
+  window.viewSubmitableReport = viewSubmitableReport;
 
   // ═══════════════════════════════════════════════════ START ════════════
   init();

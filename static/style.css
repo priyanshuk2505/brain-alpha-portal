@@ -787,6 +787,23 @@ body {
 .slot-cancel-btn:hover { background: rgba(255,77,109,0.3); }
 .slot-card.simulating .slot-cancel-btn { display: flex; }
 
+/* Timing box */
+.timing-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.timing-item { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; }
+.timing-label { color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.timing-label i { color: var(--accent-cyan); }
+.timing-val { color: var(--text-bright); font-weight: 700; font-family: var(--font-mono); }
+
 /* Batch progress */
 .batch-progress-area { padding: 0 18px 14px; }
 .batch-progress-header {

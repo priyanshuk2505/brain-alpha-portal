@@ -106,6 +106,7 @@
         <span class="auth-dot"></span>
         <span id="authBadgeLabel">Authenticated</span>
       </div>
+      <button id="viewSubmitableBtn" class="nav-btn" style="color:var(--accent-green);border-color:rgba(0,230,118,0.3)" title="View Submitable Alphas"><i class="fa-solid fa-rocket"></i> Submitable</button>
       <button id="openSettingsCredBtn" class="nav-btn"><i class="fa-solid fa-key"></i></button>
       <button id="globalCancelBtn" class="nav-btn nav-btn-danger" title="Cancel All Simulations">
         <i class="fa-solid fa-circle-stop"></i> Cancel All
@@ -334,7 +335,7 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
     <!-- ─── MAIN CONTENT ─── -->
     <main class="main-content">
 
-      <!-- 8-Slot Simulation Queue -->
+      <!-- 4-Slot Simulation Queue -->
       <div class="content-card">
         <div class="content-card-header">
           <div class="header-left">
@@ -346,12 +347,18 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
           </div>
         </div>
         <div id="slotGrid" class="slot-grid">
-          <!-- 8 slots rendered by JS -->
+          <!-- 4 slots rendered by JS -->
         </div>
 
-        <!-- Batch progress bars -->
+        <!-- Batch timing box & progress -->
         <div id="batchProgressArea" class="batch-progress-area" style="display:none;">
-          <div class="batch-progress-header">
+          <div class="timing-box">
+            <div class="timing-item"><span class="timing-label"><i class="fa-solid fa-clock"></i> Start Time:</span> <span id="batchStartTime" class="timing-val">--:--:--</span></div>
+            <div class="timing-item"><span class="timing-label"><i class="fa-solid fa-flag-checkered"></i> End Time:</span> <span id="batchEndTime" class="timing-val">Running...</span></div>
+            <div class="timing-item"><span class="timing-label"><i class="fa-solid fa-stopwatch"></i> Duration:</span> <span id="batchDuration" class="timing-val">0m 0s</span></div>
+            <button id="downloadBatchCsvBtn" class="btn-secondary-sm" style="margin-left:auto;"><i class="fa-solid fa-file-csv"></i> Download Batch CSV</button>
+          </div>
+          <div class="batch-progress-header mt-8">
             <span class="batch-progress-title"><i class="fa-solid fa-bars-progress"></i> Batch Progress</span>
             <span id="batchProgressLabel" class="batch-progress-label"></span>
           </div>

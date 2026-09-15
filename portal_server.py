@@ -17,7 +17,7 @@ import threading
 from queue import Queue
 from datetime import datetime, timezone
 import requests
-from flask import Flask, jsonify, request, render_template, send_from_directory, Response
+from flask import Flask, jsonify, request, render_template, send_from_directory, Response, send_file
 
 # Setup App
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -752,8 +752,62 @@ def log_result_to_csv(result, expression, settings):
                     f_high.write(f"Settings: Universe={universe}, Delay={delay}, Neutralization={neutralization}, Region={region}\n")
                     f_high.write("=" * 70 + "\n\n")
                 print(f"[EXCELLENT] Saved High Sharpe (>=2.0, 0 Warnings) Alpha: {expression[:50]}")
+
+            # Check for Submitable Alphas (Sharpe >= 1.25, Fitness >= 1.0, Margin >= 10bps, Turnover <= 70%, 0 failed checks)
+            t_val = float(metrics.get("turnover", 1.0))
+            if s_val >= 1.25 and f_val >= 1.0 and m_val >= 0.0001 and t_val <= 0.70 and not failed_checks:
+                SUBMITABLE_TXT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "submitable_alphas.txt")
+                SUBMITABLE_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "submitable_alphas.csv")
+                with open(SUBMITABLE_TXT, "a", encoding="utf-8") as f_sub:
+                    f_sub.write(f"Expression: {expression}\n")
+                    f_sub.write(f"Alpha ID: {result.get('alpha_id', 'N/A')}\n")
+                    f_sub.write(f"Sharpe: {s_val:.4f}, Fitness: {f_val:.4f}, Returns: {returns}%, Margin: {margin}bps, Turnover: {turnover}%\n")
+                    f_sub.write(f"Settings: Universe={universe}, Delay={delay}, Neutralization={neutralization}, Region={region}\n")
+                    f_sub.write("-" * 65 + "\n")
+                sub_exists = os.path.exists(SUBMITABLE_CSV)
+                with open(SUBMITABLE_CSV, "a", newline="", encoding="utf-8") as f_sub_csv:
+                    w = csv.writer(f_sub_csv)
+                    if not sub_exists:
+                        w.writerow(["AlphaID", "Sharpe", "Fitness", "Returns(%)", "Margin(bps)", "Turnover(%)", "Universe", "Region", "Neutralization", "Expression"])
+                    w.writerow([result.get('alpha_id', 'N/A'), s_val, f_val, returns, margin, turnover, universe, region, neutralization, expression])
+                print(f"[SUBMITABLE] Saved submitable alpha: {result.get('alpha_id')} (Sharpe {s_val:.2f})")
     except Exception as e:
         print(f"Error logging to CSV: {e}")
+
+BATCH_RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch_results")
+os.makedirs(BATCH_RESULTS_DIR, exist_ok=True)
+
+def save_batch_csv(batch_id):
+    """Write all simulation results for a specific batch to batch_results/<batch_id>.csv"""
+    if batch_id not in batch_jobs:
+        return None
+    b_data = batch_jobs[batch_id]
+    filepath = os.path.join(BATCH_RESULTS_DIR, f"{batch_id}.csv")
+    try:
+        with open(filepath, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Index", "Status", "Sharpe", "Fitness", "Returns(%)", "Drawdown(%)", "Margin(bps)", "Turnover(%)", "FailedChecks", "AlphaID", "Expression"])
+            for idx, item in enumerate(b_data.get("items", [])):
+                res = item.get("result") or {}
+                m = res.get("metrics") or {}
+                fc = ";".join(res.get("failed_checks", []))
+                writer.writerow([
+                    idx + 1,
+                    item.get("status", "QUEUED"),
+                    m.get("sharpe", ""),
+                    m.get("fitness", ""),
+                    m.get("returns", ""),
+                    m.get("drawdown", ""),
+                    m.get("margin", ""),
+                    m.get("turnover", ""),
+                    fc,
+                    res.get("alpha_id", ""),
+                    item.get("expression", "")
+                ])
+        return filepath
+    except Exception as e:
+        print(f"Error saving batch CSV: {e}")
+        return None
 
 # ── Startup: load saved credentials NOW (all helpers are defined above) ──────
 # This is the fix for "already logged in" not working across restarts.
@@ -1232,6 +1286,30 @@ def get_high_sharpe_report():
         return jsonify({"exists": True, "count": count, "content": content})
     except Exception as e:
         return jsonify({"exists": False, "error": str(e)}), 500
+
+
+@app.route("/api/reports/submitable", methods=["GET"])
+def get_submitable_report():
+    """Retrieve all submitable alphas saved in submitable_alphas.txt."""
+    sub_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "submitable_alphas.txt")
+    if not os.path.exists(sub_file):
+        return jsonify({"exists": False, "count": 0, "content": "No submitable alphas saved yet."})
+    try:
+        with open(sub_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        count = content.count("Expression:")
+        return jsonify({"exists": True, "count": count, "content": content})
+    except Exception as e:
+        return jsonify({"exists": False, "error": str(e)}), 500
+
+
+@app.route("/api/simulations/batch/<batch_id>/csv", methods=["GET"])
+def download_batch_csv(batch_id):
+    """Generate and return CSV file for a specific batch."""
+    filepath = save_batch_csv(batch_id)
+    if not filepath or not os.path.exists(filepath):
+        return jsonify({"error": "Batch CSV not found"}), 404
+    return send_file(filepath, as_attachment=True, download_name=f"batch_{batch_id}.csv")
 
 @app.route("/api/simulations/batches", methods=["GET"])
 def get_batches():

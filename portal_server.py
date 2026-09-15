@@ -1345,7 +1345,7 @@ if __name__ == "__main__":
             port = int(os.environ["PORT"])
         except Exception:
             pass
-    print(f"Starting WorldQuant BRAIN Batch Alpha Portal Server on http://127.0.0.1:{port}")
-    app.run(host="127.0.0.1", port=port, debug=False)
+    print(f"Starting WorldQuant BRAIN Batch Alpha Portal Server on port {port} (all network interfaces)...")
+    app.run(host="0.0.0.0", port=port, debug=False)
 
 

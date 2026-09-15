@@ -579,15 +579,26 @@ def run_single_simulation(expression, settings, dry_run=False):
 
             if resp.status_code == 429:
                 wait = int(resp.headers.get("Retry-After", backoff))
-                print(f"[SIM] Rate limited, sleeping {wait}s (remaining={rate_limit_state.get('remaining')})")
+                print(f"[SIM] Rate limited (429), sleeping {wait}s (remaining={rate_limit_state.get('remaining')})")
                 time.sleep(wait)
                 backoff = min(backoff * 2, 120)
                 continue
 
+            if resp.status_code == 400:
+                err_text = resp.text
+                err_upper = err_text.upper()
+                if any(kw in err_upper for kw in ["LIMIT", "CONCURRENT", "SIMULATION", "THROTTLE", "REACHED", "TOO MANY"]):
+                    wait = 6 * (attempt + 1)
+                    print(f"[SIM] Concurrency/Limit HTTP 400 on attempt {attempt+1}, sleeping {wait}s...")
+                    time.sleep(wait)
+                    continue
+                else:
+                    print(f"[SIM] Error response (400): {err_text[:400]}")
+                    return {"status": "HTTP_400", "error": err_text[:400], "hash": alpha_hash}
+
             if resp.status_code in [201, 202]:
                 break
 
-            # Bad request — don't retry
             err_text = resp.text[:400]
             print(f"[SIM] Error response: {err_text}")
             return {"status": f"HTTP_{resp.status_code}", "error": err_text, "hash": alpha_hash}
@@ -685,9 +696,9 @@ load_auth_credentials()
 print(f"[STARTUP] Auth state: email={auth_state.get('user_email')} cookie={'SET' if auth_state.get('cookie') else 'NONE'}")
 
 # -----------------------------------------------------------------------------
-# Background Queue Worker — 8 Parallel Slots (BRAIN Concurrency Limit)
+# Background Queue Worker — 4 Parallel Slots (User Account Concurrency Limit)
 # -----------------------------------------------------------------------------
-MAX_CONCURRENT_SIMS = 8
+MAX_CONCURRENT_SIMS = 4
 
 # Shared cancel event — set to stop all in-flight simulations & drain queue
 cancel_event = threading.Event()

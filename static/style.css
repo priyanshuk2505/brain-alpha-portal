@@ -718,8 +718,8 @@ body {
 
 .slot-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
   padding: 14px 18px;
 }
 

@@ -979,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>
           <div class="action-btns">
             ${alphaId ? `<button class="act-btn act-btn-view" onclick="openPnlModal('${alphaId}', ${JSON.stringify({sharpe, fitness, returns, margin, turnover, drawdown, universe: r.universe, delay: r.delay, neutralization: r.neutralization}).replace(/"/g, '&quot;')})"><i class="fa-solid fa-chart-area"></i> PnL</button>` : ''}
+            ${alphaId && !alphaId.startsWith('MOCK_') ? `<button class="act-btn act-btn-submit" onclick="submitSingleAlpha('${alphaId}')" title="Submit Alpha to WorldQuant BRAIN"><i class="fa-solid fa-paper-plane"></i> Submit</button>` : ''}
             <button class="act-btn act-btn-copy" onclick="copyText('${encodeURIComponent(expr)}')"><i class="fa-solid fa-copy"></i></button>
           </div>
         </td>
@@ -1141,6 +1142,37 @@ document.addEventListener('DOMContentLoaded', () => {
   function escHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
+
+  window.submitSingleAlpha = async function(alphaId) {
+    if (!alphaId) return;
+    if (!confirm(`Submit Alpha ${alphaId} to WorldQuant BRAIN for approval?`)) return;
+    try {
+      toast(`Submitting Alpha ${alphaId}...`, 'info');
+      const resp = await fetch(`/api/alphas/${alphaId}/submit`, { method: 'POST' });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        toast(`✅ ${data.message}`, 'success');
+      } else {
+        toast(`❌ ${data.error || 'Submission failed'}`, 'error');
+      }
+    } catch (err) {
+      toast(`Submission error: ${err.message}`, 'error');
+    }
+  };
+
+  window.viewHighSharpeFile = async function() {
+    try {
+      const resp = await fetch('/api/reports/high-sharpe');
+      const data = await resp.json();
+      if (!data.exists || !data.count) {
+        toast('No Sharpe ≥ 2.0 (0 warnings) alphas saved yet.', 'warning');
+        return;
+      }
+      alert(`🏆 Saved High-Sharpe Alphas (Count: ${data.count}):\n\n${data.content.substring(0, 1500)}${data.content.length > 1500 ? '\n... (see high_sharpe_zero_warnings.txt)' : ''}`);
+    } catch (err) {
+      toast(`Error fetching report: ${err.message}`, 'error');
+    }
+  };
 
   // ═══════════════════════════════════════════════════ START ════════════
   init();

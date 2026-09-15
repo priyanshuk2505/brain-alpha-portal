@@ -974,6 +974,11 @@ body {
   color: var(--text-muted);
 }
 .act-btn-copy:hover { border-color: var(--border-accent); color: var(--accent-cyan); }
+.act-btn-submit {
+  border-color: rgba(0, 230, 118, 0.4);
+  color: #00e676;
+}
+.act-btn-submit:hover { background: rgba(0, 230, 118, 0.15); box-shadow: 0 0 10px rgba(0, 230, 118, 0.2); }
 
 .failed-checks {
   display: flex; flex-wrap: wrap; gap: 3px;

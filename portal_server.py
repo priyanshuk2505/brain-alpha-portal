@@ -427,13 +427,19 @@ def extract_metrics(data, session, headers=None):
 
 def _build_sim_payload(expression, settings):
     """Build the simulation payload dict from expression + settings."""
+    region = settings.get("region", "USA")
+    neut = settings.get("neutralization", "INDUSTRY")
+    if region != "USA" and neut == "RAM":
+        neut = "INDUSTRY"
+        print(f"[SIM] Auto-corrected RAM neutralization to INDUSTRY for non-USA region '{region}'")
+
     payload_settings = {
         "instrumentType": settings.get("instrumentType", "EQUITY"),
-        "region": settings.get("region", "USA"),
+        "region": region,
         "universe": settings.get("universe", "TOP3000"),
         "delay": int(settings.get("delay", 1)),
         "decay": int(settings.get("decay", 0)),
-        "neutralization": settings.get("neutralization", "INDUSTRY"),
+        "neutralization": neut,
         "truncation": float(settings.get("truncation", 0.08)),
         "pasteurization": settings.get("pasteurization", "ON"),
         "nanHandling": settings.get("nanHandling", "OFF"),
@@ -714,6 +720,17 @@ def log_result_to_csv(result, expression, settings):
                     f_elite.write(f"Code: {expression}\n")
                     f_elite.write(f"Sharpe: {s_val:.4f}, Fitness: {f_val:.4f}, Returns: {returns}%, Margin(bps): {margin}, Turnover: {turnover}%, Universe: {universe}, Delay: {delay}, Neutralization: {neutralization}\n")
                     f_elite.write("-" * 60 + "\n")
+
+            # Check for Zero Warning & Sharpe >= 2.0 condition
+            HIGH_SHARPE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "high_sharpe_zero_warnings.txt")
+            if s_val >= 2.0 and not failed_checks:
+                with open(HIGH_SHARPE_FILE, "a", encoding="utf-8") as f_high:
+                    f_high.write(f"Expression: {expression}\n")
+                    f_high.write(f"Alpha ID: {result.get('alpha_id', 'N/A')}\n")
+                    f_high.write(f"Sharpe: {s_val:.4f}, Fitness: {f_val:.4f}, Returns: {returns}%, Margin(bps): {margin}, Turnover: {turnover}%\n")
+                    f_high.write(f"Settings: Universe={universe}, Delay={delay}, Neutralization={neutralization}, Region={region}\n")
+                    f_high.write("=" * 70 + "\n\n")
+                print(f"[EXCELLENT] Saved High Sharpe (>=2.0, 0 Warnings) Alpha: {expression[:50]}")
     except Exception as e:
         print(f"Error logging to CSV: {e}")
 
@@ -988,6 +1005,11 @@ def enqueue_batch():
     data = request.get_json() or {}
     raw_expressions = data.get("expressions", [])
     settings = data.get("settings", {})
+    # Auto-correct RAM neutralization for non-USA regions (BRAIN API restricts RAM to USA)
+    if settings.get("region", "USA") != "USA" and settings.get("neutralization") == "RAM":
+        settings["neutralization"] = "INDUSTRY"
+        print(f"[BATCH] Auto-corrected RAM neutralization to INDUSTRY for region {settings.get('region')}")
+
     dry_run = data.get("dry_run", False) or settings.get("dry_run", False)
     auto_submit = data.get("auto_submit", False) or settings.get("auto_submit", False)
     
@@ -1163,6 +1185,32 @@ def get_settings_options():
 def get_slots():
     with slot_lock:
         return jsonify(list(slot_status.values()))
+
+
+@app.route("/api/alphas/<alpha_id>/submit", methods=["POST"])
+def submit_single_alpha_route(alpha_id):
+    """Manually submit a completed alpha to WorldQuant BRAIN for approval/production."""
+    if not alpha_id or alpha_id.startswith("MOCK_"):
+        return jsonify({"success": False, "error": "Cannot submit mock alpha ID"}), 400
+    ok, msg = submit_alpha_to_brain(alpha_id)
+    if ok:
+        return jsonify({"success": True, "message": f"Alpha {alpha_id} submitted: {msg}"})
+    return jsonify({"success": False, "error": f"Submission failed: {msg}"}), 400
+
+
+@app.route("/api/reports/high-sharpe", methods=["GET"])
+def get_high_sharpe_report():
+    """Retrieve all high-Sharpe (>= 2.0) alphas with zero warnings saved in high_sharpe_zero_warnings.txt."""
+    high_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "high_sharpe_zero_warnings.txt")
+    if not os.path.exists(high_file):
+        return jsonify({"exists": False, "count": 0, "content": "No high-Sharpe (>=2.0, 0 warnings) alphas saved yet."})
+    try:
+        with open(high_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        count = content.count("Expression:")
+        return jsonify({"exists": True, "count": count, "content": content})
+    except Exception as e:
+        return jsonify({"exists": False, "error": str(e)}), 500
 
 @app.route("/api/simulations/batches", methods=["GET"])
 def get_batches():

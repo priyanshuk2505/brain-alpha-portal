@@ -94,6 +94,34 @@ def save_auth_credentials(email=None, password=None):
         except Exception as e:
             print(f"Error saving ~/.brain_credentials: {e}")
 
+def format_brain_api_error(err_text: str) -> str:
+    """Format BRAIN API JSON error body into a concise, human-readable error message."""
+    if not err_text:
+        return "Unknown API Error"
+    try:
+        data = json.loads(err_text)
+        if isinstance(data, dict):
+            if "settings" in data and isinstance(data["settings"], dict):
+                parts = []
+                for k, v in data["settings"].items():
+                    if isinstance(v, list):
+                        v_str = ", ".join(str(item) for item in v)
+                    else:
+                        v_str = str(v)
+                    parts.append(f"Setting '{k}': {v_str}")
+                if parts:
+                    return "; ".join(parts)
+            if "detail" in data:
+                return str(data["detail"])
+            if "message" in data:
+                return str(data["message"])
+            if "error" in data:
+                return str(data["error"])
+    except Exception:
+        pass
+    return err_text[:400]
+
+
 # NOTE: _apply_session_cookie is defined later, so we defer calling load_auth_credentials
 # until after all functions are defined. See end of startup block.
 
@@ -593,15 +621,16 @@ def run_single_simulation(expression, settings, dry_run=False):
                     time.sleep(wait)
                     continue
                 else:
-                    print(f"[SIM] Error response (400): {err_text[:400]}")
-                    return {"status": "HTTP_400", "error": err_text[:400], "hash": alpha_hash}
+                    formatted_err = format_brain_api_error(err_text)
+                    print(f"[SIM] Error response (400): {formatted_err}")
+                    return {"status": "HTTP_400", "error": formatted_err, "hash": alpha_hash}
 
             if resp.status_code in [201, 202]:
                 break
 
-            err_text = resp.text[:400]
-            print(f"[SIM] Error response: {err_text}")
-            return {"status": f"HTTP_{resp.status_code}", "error": err_text, "hash": alpha_hash}
+            formatted_err = format_brain_api_error(resp.text)
+            print(f"[SIM] Error response: {formatted_err}")
+            return {"status": f"HTTP_{resp.status_code}", "error": formatted_err, "hash": alpha_hash}
 
         except Exception as e:
             print(f"[SIM] Request exception: {e}")

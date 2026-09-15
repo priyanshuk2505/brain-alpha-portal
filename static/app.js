@@ -862,7 +862,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="cell-pass">♻ Cached ${sharpe != null ? `(${Number(sharpe).toFixed(2)})` : ''}</span>
           </td>`;
         }
-        return `<td class="matrix-cell"><span class="cell-fail">✗ ${result?.status || 'FAILED'}</span></td>`;
+        const errTooltip = result?.error ? escHtml(result.error) : escHtml(result?.status || 'FAILED');
+        return `<td class="matrix-cell" title="${errTooltip}"><span class="cell-fail" title="${errTooltip}">✗ ${escHtml(result?.status || 'FAILED')}</span></td>`;
       }).join('');
 
       return `<tr>

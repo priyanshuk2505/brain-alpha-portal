@@ -320,7 +320,9 @@ def authenticate_brain_user(email, password):
         return False, f"Connection error: {str(e)}", None, None
 
 def _jwt_is_expired(cookie_str):
-    """Quickly decode the JWT payload and check expiry without hitting BRAIN."""
+    """Quickly decode the JWT payload and check expiry without hitting BRAIN API."""
+    if not cookie_str:
+        return True
     try:
         token = ""
         for part in cookie_str.split(";"):
@@ -329,6 +331,11 @@ def _jwt_is_expired(cookie_str):
                 token = part[2:]
                 break
         if not token:
+            # Fallback: check if the string itself is a raw JWT token starting with eyJ
+            if "eyJ" in cookie_str:
+                token = cookie_str[cookie_str.find("eyJ"):]
+                token = token.split(";")[0].split(" ")[0].strip()
+        if not token:
             return True
         payload_b64 = token.split(".")[1]
         padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
@@ -336,26 +343,26 @@ def _jwt_is_expired(cookie_str):
         payload = json.loads(base64.urlsafe_b64decode(padded))
         exp = payload.get("exp", 0)
         return time.time() > exp
-    except Exception:
+    except Exception as e:
+        print(f"[AUTH] Error decoding JWT: {e}")
         return True  # treat unreadable JWT as expired
 
 def check_auth_status():
     session = get_brain_session()
-
     current_cookie = auth_state.get("cookie", "")
-    auth_at = auth_state.get("authenticated_at", 0)
-    now = time.time()
 
-    # ── 4-Hour Device Session Window ──
-    # If session was authenticated within the last 4 hours (14,400s) and JWT is not expired, maintain authenticated state
-    if current_cookie and (now - auth_at < 14400) and not _jwt_is_expired(current_cookie):
+    # ── 4-Hour JWT Device Session ──
+    # WorldQuant BRAIN session tokens are valid for 4 hours (14,400s) from login.
+    # While token is valid, instantly grant access without requiring email/password or Face ID.
+    if current_cookie and not _jwt_is_expired(current_cookie):
         auth_state["authenticated"] = True
         return True, auth_state.get("user_email", "PK18292")
 
+    # If JWT is expired, attempt auto-refresh with saved credentials
     if current_cookie and _jwt_is_expired(current_cookie):
         auth_state["authenticated"] = False
         if auth_state.get("saved_email") and auth_state.get("saved_password"):
-            print(f"[AUTH] JWT expired locally. Auto-refreshing for {auth_state['saved_email']}...")
+            print(f"[AUTH] JWT expired. Auto-refreshing for {auth_state['saved_email']}...")
             ok, msg, inquiry_id, persona_url = authenticate_brain_user(
                 auth_state["saved_email"], auth_state["saved_password"])
             if ok:

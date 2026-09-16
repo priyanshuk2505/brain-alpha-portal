@@ -219,7 +219,8 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
             <div class="setting-row full">
               <label class="setting-label">UNIVERSE <i class="fa-solid fa-circle-info info-tip" title="Instrument universe"></i></label>
               <select id="sUniverse" class="field-select">
-                <option value="TOP3000">TOP3000</option>
+                <option value="ALL_UNIVERSES">🌐 Sweep All Universes (3000, 2000, 1000, 500, 200)</option>
+                <option value="TOP3000" selected>TOP3000</option>
                 <option value="MINVOL1M">MINVOL1M</option>
                 <option value="MINVOL10M">MINVOL10M</option>
                 <option value="TOPDIV3000">TOPDIV3000</option>
@@ -233,17 +234,18 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
             <div class="setting-row full">
               <label class="setting-label">NEUTRALIZATION <i class="fa-solid fa-circle-info info-tip" title="Portfolio neutralization method"></i></label>
               <select id="sNeutralization" class="field-select">
-                <option value="NONE">None</option>
+                <option value="ALL_NEUT">🌐 Sweep All Sectors (Industry, Subindustry, Sector, Market)</option>
+                <option value="INDUSTRY" selected>Industry</option>
+                <option value="SUBINDUSTRY">Subindustry</option>
+                <option value="SECTOR">Sector</option>
+                <option value="MARKET">Market</option>
+                <option value="COUNTRY">Country / Region</option>
                 <option value="RAM">RAM</option>
                 <option value="STATISTICAL">Statistical</option>
                 <option value="CROWDING">Crowding Factors</option>
                 <option value="FAST">Fast Factors</option>
                 <option value="SLOW">Slow Factors</option>
-                <option value="MARKET">Market</option>
-                <option value="SECTOR">Sector</option>
-                <option value="INDUSTRY" selected>Industry</option>
-                <option value="SUBINDUSTRY">Subindustry</option>
-                <option value="COUNTRY">Country / Region</option>
+                <option value="NONE">None</option>
                 <option value="SLOW_FAST">Slow + Fast Factors</option>
               </select>
             </div>

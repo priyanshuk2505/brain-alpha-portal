@@ -1114,27 +1114,43 @@ def enqueue_batch():
         
     if not expressions:
         return jsonify({"error": "No valid expressions provided"}), 400
-        
+
+    # Expand Multi-Universe and Multi-Neutralization selections if requested
+    target_universes = [settings.get("universe", "TOP3000")]
+    if settings.get("universe") == "ALL_UNIVERSES":
+        target_universes = ["TOP3000", "TOP2000", "TOP1000", "TOP500", "TOP200"]
+
+    target_neut = [settings.get("neutralization", "INDUSTRY")]
+    if settings.get("neutralization") == "ALL_NEUT":
+        target_neut = ["INDUSTRY", "SUBINDUSTRY", "SECTOR", "MARKET"]
+
     batch_id = f"BATCH_{int(time.time())}_{random.randint(1000, 9999)}"
     batch_item_records = []
-    
-    for idx, expr in enumerate(expressions):
-        item_obj = {
-            "id": f"{batch_id}_{idx}",
-            "expression": expr,
-            "settings": settings,
-            "status": "QUEUED",
-            "dry_run": dry_run,
-            "auto_submit": auto_submit,
-            "result": None
-        }
-        batch_item_records.append(item_obj)
-        job_queue.put((batch_id, idx, item_obj))
+    task_idx = 0
+
+    for expr in expressions:
+        for u in target_universes:
+            for n in target_neut:
+                item_settings = dict(settings)
+                item_settings["universe"] = u
+                item_settings["neutralization"] = n
+                item_obj = {
+                    "id": f"{batch_id}_{task_idx}",
+                    "expression": expr,
+                    "settings": item_settings,
+                    "status": "QUEUED",
+                    "dry_run": dry_run,
+                    "auto_submit": auto_submit,
+                    "result": None
+                }
+                batch_item_records.append(item_obj)
+                job_queue.put((batch_id, task_idx, item_obj))
+                task_idx += 1
         
     batch_job_record = {
         "batch_id": batch_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "total": len(expressions),
+        "total": len(batch_item_records),
         "completed": 0,
         "progress": 0.0,
         "status": "RUNNING",

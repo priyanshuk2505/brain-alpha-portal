@@ -450,9 +450,10 @@ def _build_sim_payload(expression, settings):
     """Build the simulation payload dict from expression + settings."""
     region = settings.get("region", "USA")
     neut = settings.get("neutralization", "INDUSTRY")
-    if region != "USA" and neut == "RAM":
+    # WorldQuant BRAIN API rejects RAM neutralization across all regions (returns HTTP 400)
+    if neut == "RAM":
         neut = "INDUSTRY"
-        print(f"[SIM] Auto-corrected RAM neutralization to INDUSTRY for non-USA region '{region}'")
+        print(f"[SIM] Auto-corrected invalid RAM neutralization to INDUSTRY for region '{region}'")
 
     payload_settings = {
         "instrumentType": settings.get("instrumentType", "EQUITY"),
@@ -1091,8 +1092,8 @@ def enqueue_batch():
     data = request.get_json() or {}
     raw_expressions = data.get("expressions", [])
     settings = data.get("settings", {})
-    # Auto-correct RAM neutralization for non-USA regions (BRAIN API restricts RAM to USA)
-    if settings.get("region", "USA") != "USA" and settings.get("neutralization") == "RAM":
+    # Auto-correct RAM neutralization (deprecated by WorldQuant BRAIN API)
+    if settings.get("neutralization") == "RAM":
         settings["neutralization"] = "INDUSTRY"
         print(f"[BATCH] Auto-corrected RAM neutralization to INDUSTRY for region {settings.get('region')}")
 

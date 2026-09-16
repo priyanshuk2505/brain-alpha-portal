@@ -817,9 +817,11 @@ load_auth_credentials()
 print(f"[STARTUP] Auth state: email={auth_state.get('user_email')} cookie={'SET' if auth_state.get('cookie') else 'NONE'}")
 
 # -----------------------------------------------------------------------------
-# Background Queue Worker — 4 Parallel Slots (User Account Concurrency Limit)
 # -----------------------------------------------------------------------------
-MAX_CONCURRENT_SIMS = 4
+# Background Queue Worker — 8 Parallel Slots (GLB capped at 4, USA/Others 8)
+# -----------------------------------------------------------------------------
+MAX_CONCURRENT_SIMS = 8
+glb_semaphore = threading.BoundedSemaphore(4)
 
 # Shared cancel event — set to stop all in-flight simulations & drain queue
 cancel_event = threading.Event()
@@ -856,36 +858,45 @@ def worker_slot(slot_id):
         settings = item["settings"]
         dry_run = item["dry_run"]
         auto_submit = item.get("auto_submit", False)
+        region = settings.get("region", "USA")
+        is_glb = (region == "GLB")
 
-        # Mark slot as busy
-        with slot_lock:
-            slot_status[slot_id].update({
-                "status": "SIMULATING",
-                "expression": expression[:80] + ("..." if len(expression) > 80 else ""),
-                "batch_id": batch_id,
-                "item_index": item_index,
-                "start_time": datetime.now(timezone.utc).isoformat()
-            })
+        if is_glb:
+            glb_semaphore.acquire()
 
-        with jobs_lock:
-            if batch_id in batch_jobs:
-                batch_jobs[batch_id]["items"][item_index]["status"] = "SIMULATING"
-                batch_jobs[batch_id]["items"][item_index]["slot"] = slot_id + 1
-                batch_jobs[batch_id]["items"][item_index]["start_time"] = datetime.now(timezone.utc).isoformat()
+        try:
+            # Mark slot as busy
+            with slot_lock:
+                slot_status[slot_id].update({
+                    "status": "SIMULATING",
+                    "expression": expression[:80] + ("..." if len(expression) > 80 else ""),
+                    "batch_id": batch_id,
+                    "item_index": item_index,
+                    "start_time": datetime.now(timezone.utc).isoformat()
+                })
 
-        res = run_single_simulation(expression, settings, dry_run=dry_run)
+            with jobs_lock:
+                if batch_id in batch_jobs:
+                    batch_jobs[batch_id]["items"][item_index]["status"] = "SIMULATING"
+                    batch_jobs[batch_id]["items"][item_index]["slot"] = slot_id + 1
+                    batch_jobs[batch_id]["items"][item_index]["start_time"] = datetime.now(timezone.utc).isoformat()
 
-        # Auto-submit check
-        metrics = res.get("metrics") or {}
-        sharpe = float(metrics.get("sharpe", 0.0))
-        if auto_submit and res.get("status") in ["SUCCESS", "CACHED_DUPLICATE"] and sharpe >= 0.5:
-            alpha_id = res.get("alpha_id")
-            if alpha_id:
-                sub_ok, sub_msg = submit_alpha_to_brain(alpha_id, dry_run=dry_run)
-                res["submitted"] = sub_ok
-                res["submit_msg"] = sub_msg
+            res = run_single_simulation(expression, settings, dry_run=dry_run)
 
-        log_result_to_csv(res, expression, settings)
+            # Auto-submit check
+            metrics = res.get("metrics") or {}
+            sharpe = float(metrics.get("sharpe", 0.0))
+            if auto_submit and res.get("status") in ["SUCCESS", "CACHED_DUPLICATE"] and sharpe >= 0.5:
+                alpha_id = res.get("alpha_id")
+                if alpha_id:
+                    sub_ok, sub_msg = submit_alpha_to_brain(alpha_id, dry_run=dry_run)
+                    res["submitted"] = sub_ok
+                    res["submit_msg"] = sub_msg
+
+            log_result_to_csv(res, expression, settings)
+        finally:
+            if is_glb:
+                glb_semaphore.release()
 
         with jobs_lock:
             if batch_id in batch_jobs:
@@ -912,7 +923,7 @@ def worker_slot(slot_id):
 
         job_queue.task_done()
 
-# Launch all 7 worker threads
+# Launch all 8 worker threads
 worker_threads = []
 for _slot_id in range(MAX_CONCURRENT_SIMS):
     t = threading.Thread(target=worker_slot, args=(_slot_id,), daemon=True)

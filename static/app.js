@@ -953,14 +953,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResultsTable() {
     const tbody = document.getElementById('resultsBody');
     const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase();
-    const fStatus = document.getElementById('filterStatus')?.value || 'ALL';
-    const fUniverse = document.getElementById('filterUniverse')?.value || 'ALL';
+    const fUniverse = (document.getElementById('filterUniverse')?.value || '').trim().toLowerCase();
     const fSharpe = document.getElementById('filterSharpe')?.value || 'ALL';
 
     let data = state.results.filter(r => {
       if (state.eliteOnly && (r.sharpe == null || Number(r.sharpe) < 1.25)) return false;
       if (fStatus !== 'ALL' && r.status !== fStatus) return false;
-      if (fUniverse !== 'ALL' && r.universe !== fUniverse) return false;
+      if (fUniverse && fUniverse !== 'all' && !(r.universe || '').toLowerCase().includes(fUniverse)) return false;
       if (fSharpe !== 'ALL') {
         const threshold = parseFloat(fSharpe);
         if (r.sharpe == null || Number(r.sharpe) < threshold) return false;

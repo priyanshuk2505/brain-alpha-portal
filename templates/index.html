@@ -404,16 +404,7 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
             <option value="CACHED_DUPLICATE">CACHED</option>
             <option value="FAILED">FAILED</option>
           </select>
-          <select id="filterUniverse" class="field-select filter-select">
-            <option value="ALL">All Universes</option>
-            <option value="TOP3000">TOP3000</option>
-            <option value="MINVOL1M">MINVOL1M</option>
-            <option value="MINVOL10M">MINVOL10M</option>
-            <option value="TOPDIV3000">TOPDIV3000</option>
-            <option value="TOP2000">TOP2000</option>
-            <option value="TOP1000">TOP1000</option>
-            <option value="TOP500">TOP500</option>
-          </select>
+          <input type="text" id="filterUniverse" class="search-input" placeholder="Filter universe..." style="width:140px;padding:7px 10px;font-size:0.75rem">
           <select id="filterSharpe" class="field-select filter-select">
             <option value="ALL">All Sharpe</option>
             <option value="1.25">≥ 1.25 Elite</option>

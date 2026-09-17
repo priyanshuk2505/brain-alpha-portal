@@ -672,9 +672,23 @@ def run_single_simulation(expression, settings, dry_run=False):
                         time.sleep(1)
                         continue
                     elif persona_url:
-                        return {"status": "FACE_REQUIRED", "error": "Face verification required. Please click 'Open Face Scan' in portal login modal.", "hash": alpha_hash}
-                formatted_err = format_brain_api_error(resp.text)
-                return {"status": f"HTTP_{resp.status_code}", "error": f"Session expired/forbidden (HTTP {resp.status_code}). Please click 'Sign In' or update Cookie.", "hash": alpha_hash}
+                        auth_state["pending_persona_url"] = persona_url
+                        print(f"[SIM] Face verification required ({persona_url}). Waiting 15s for user to complete scan...")
+                        time.sleep(15)
+                        session = get_brain_session()
+                        if auth_state.get("authenticated"):
+                            continue
+
+                print(f"[SIM] Session expired (HTTP {resp.status_code}). Pausing worker thread for 15s waiting for re-login...")
+                time.sleep(15)
+                session = get_brain_session()
+                if auth_state.get("authenticated"):
+                    continue
+
+                if attempt == 2:
+                    formatted_err = format_brain_api_error(resp.text)
+                    return {"status": f"HTTP_{resp.status_code}", "error": f"Session expired/forbidden (HTTP {resp.status_code}). Please click 'Sign In' or update Cookie.", "hash": alpha_hash}
+                continue
 
             if resp.status_code == 429:
                 wait = int(resp.headers.get("Retry-After", backoff))

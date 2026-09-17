@@ -137,6 +137,8 @@ def format_brain_api_error(err_text: str) -> str:
 # In-Memory Cache and Batch Jobs Storage
 cache_lock = threading.RLock()
 jobs_lock = threading.RLock()
+auth_pause_event = threading.Event()
+auth_pause_event.set()  # Starts unpaused when authenticated
 
 batch_jobs = {}  # batch_id -> dict
 job_queue = Queue()
@@ -273,6 +275,7 @@ def authenticate_brain_user(email, password):
             auth_state["user_email"] = email
             auth_state["authenticated"] = True
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
+            auth_pause_event.set()  # Unpause worker threads
             save_auth_credentials(email, password)
             print(f"[AUTH] Authenticated as {email}. Cookie: {auth_state['cookie'][:60]}...")
             return True, "Authenticated successfully with WorldQuant BRAIN", None, None
@@ -375,17 +378,20 @@ def check_auth_status():
     # While token is valid, instantly grant access without requiring email/password or Face ID.
     if current_cookie and not _jwt_is_expired(current_cookie):
         auth_state["authenticated"] = True
+        auth_pause_event.set()
         return True, auth_state.get("user_email", "PK18292")
 
     # If JWT is expired, attempt auto-refresh with saved credentials
     if current_cookie and _jwt_is_expired(current_cookie):
         auth_state["authenticated"] = False
+        auth_pause_event.clear()
         if auth_state.get("saved_email") and auth_state.get("saved_password"):
             print(f"[AUTH] JWT expired. Auto-refreshing for {auth_state['saved_email']}...")
             ok, msg, inquiry_id, persona_url = authenticate_brain_user(
                 auth_state["saved_email"], auth_state["saved_password"])
             if ok:
                 auth_state["authenticated_at"] = time.time()
+                auth_pause_event.set()
                 return True, auth_state["user_email"]
             if persona_url:
                 return False, f"FACE_REQUIRED:{persona_url}"
@@ -397,6 +403,7 @@ def check_auth_status():
         if resp.status_code == 200:
             data = resp.json()
             auth_state["authenticated"] = True
+            auth_pause_event.set()
             user_data = data.get("user") or {}
             auth_state["user_email"] = user_data.get("id") or data.get("email") or auth_state["user_email"]
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
@@ -404,6 +411,7 @@ def check_auth_status():
             return True, auth_state["user_email"]
         elif resp.status_code == 204:
             auth_state["authenticated"] = False
+            auth_pause_event.clear()
             if auth_state.get("saved_email") and auth_state.get("saved_password"):
                 print(f"[AUTH] Not authenticated (204). Auto-refreshing for {auth_state['saved_email']}...")
                 ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
@@ -891,6 +899,18 @@ slot_lock = threading.Lock()
 def worker_slot(slot_id):
     """Each slot runs as a permanent daemon thread, pulling from job_queue."""
     while True:
+        # Pause completely if authentication is lost or Face ID scan is pending
+        if not auth_pause_event.is_set():
+            with slot_lock:
+                slot_status[slot_id].update({
+                    "status": "PAUSED_AUTH",
+                    "expression": "Paused — waiting for Re-login / Face ID verification...",
+                    "batch_id": None, "item_index": None, "start_time": None
+                })
+            auth_pause_event.wait()
+            with slot_lock:
+                slot_status[slot_id].update({"status": "IDLE", "expression": None})
+
         job_item = job_queue.get()
         if job_item is None:
             job_queue.task_done()

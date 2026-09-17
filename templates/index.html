@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.withpersona.com/dist/persona-v4.9.0.js"></script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=20260918">
 </head>
 <body>
 
@@ -217,24 +217,8 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
             </div>
 
             <div class="setting-row full">
-              <label class="setting-label">UNIVERSE <i class="fa-solid fa-circle-info info-tip" title="Enter universe manually or choose suggestions (e.g. TOP3000, GLB_TOP3000, EUR_TOP1000, or comma-separated list)"></i></label>
-              <input type="text" id="sUniverse" class="field-input" value="TOP3000" placeholder="e.g. TOP3000, GLB_TOP3000, EUR_TOP1000..." list="universeDatalist" autocomplete="off">
-              <datalist id="universeDatalist">
-                <option value="TOP3000">TOP3000 (USA / Standard)</option>
-                <option value="TOP2000">TOP2000 (USA)</option>
-                <option value="TOP1000">TOP1000 (USA)</option>
-                <option value="TOP500">TOP500 (USA)</option>
-                <option value="TOP200">TOP200 (USA)</option>
-                <option value="GLB_TOP3000">GLB_TOP3000 (Global)</option>
-                <option value="EUR_TOP1000">EUR_TOP1000 (Europe)</option>
-                <option value="ASI_TOP1000">ASI_TOP1000 (Asia)</option>
-                <option value="IND_TOP500">IND_TOP500 (India)</option>
-                <option value="CHN_TOP1000">CHN_TOP1000 (China)</option>
-                <option value="MINVOL1M">MINVOL1M</option>
-                <option value="MINVOL10M">MINVOL10M</option>
-                <option value="TOPDIV3000">TOPDIV3000</option>
-                <option value="ALL_UNIVERSES">ALL_UNIVERSES (Sweep 3000, 2000, 1000, 500, 200)</option>
-              </datalist>
+              <label class="setting-label">UNIVERSE <i class="fa-solid fa-circle-info info-tip" title="Enter universe manually (e.g. TOP3000, GLB_TOP3000, EUR_TOP1000, or comma-separated list like TOP3000, TOP1000)"></i></label>
+              <input type="text" id="sUniverse" class="field-input" value="TOP3000" placeholder="Type universe manually e.g. TOP3000, GLB_TOP3000, EUR_TOP1000..." autocomplete="off">
               <div class="univ-quick-chips">
                 <span class="chip-label">Quick:</span>
                 <button type="button" class="univ-chip" data-univ="TOP3000">TOP3000</button>
@@ -506,6 +490,6 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
 <!-- Toast container -->
 <div id="toastContainer" class="toast-container"></div>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=20260918"></script>
 </body>
 </html>

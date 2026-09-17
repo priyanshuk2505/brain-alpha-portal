@@ -28,6 +28,7 @@ CACHE_FILE = os.path.join(WORKSPACE_DIR, "simulation_cache.json")
 RESULTS_CSV = os.path.join(WORKSPACE_DIR, "simulation_results.csv")
 ELITE_FILE = os.path.join(WORKSPACE_DIR, "elite_alphas.txt")
 AUTH_FILE = os.path.join(WORKSPACE_DIR, "auth_credentials.json")
+BATCH_JOBS_FILE = os.path.join(WORKSPACE_DIR, "batch_jobs.json")
 
 # Default JWT — updated 2026-09-12. Replace when expired.
 DEFAULT_COOKIE = "t=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI1ekRNdU1WTnQ2WmZlZUZjOXRKMjNTVTFycnZsUTFhWSIsImV4cCI6MTc4OTIyNzQxOCwiYW1yIjpbInB3ZCIsImZhY2UiLCJjYXB0Y2hhIl19.E4zgwOfiLMshfDgDVvU_hraYo8yhjJ7CaTYI_qTkWzc"
@@ -134,11 +135,29 @@ def format_brain_api_error(err_text: str) -> str:
 
 
 # In-Memory Cache and Batch Jobs Storage
-cache_lock = threading.Lock()
-jobs_lock = threading.Lock()
+cache_lock = threading.RLock()
+jobs_lock = threading.RLock()
 
 batch_jobs = {}  # batch_id -> dict
 job_queue = Queue()
+
+def load_batch_jobs():
+    if os.path.exists(BATCH_JOBS_FILE):
+        try:
+            with open(BATCH_JOBS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[BATCH] Error loading batch jobs file: {e}")
+    return {}
+
+def save_batch_jobs(data=None):
+    with jobs_lock:
+        try:
+            target = data if data is not None else batch_jobs
+            with open(BATCH_JOBS_FILE, "w", encoding="utf-8") as f:
+                json.dump(target, f, indent=2)
+        except Exception as e:
+            print(f"[BATCH] Error saving batch jobs file: {e}")
 
 # -----------------------------------------------------------------------------
 # SHA256 Simulation Cache Engine
@@ -935,6 +954,7 @@ def worker_slot(slot_id):
                 if completed == total:
                     batch_jobs[batch_id]["status"] = "COMPLETED"
                     batch_jobs[batch_id]["end_time"] = datetime.now(timezone.utc).isoformat()
+                save_batch_jobs()
 
         # Mark slot as idle
         with slot_lock:
@@ -947,6 +967,21 @@ def worker_slot(slot_id):
             })
 
         job_queue.task_done()
+
+# Restore persisted batch jobs from disk on startup
+loaded_batch_jobs = load_batch_jobs()
+if loaded_batch_jobs:
+    with jobs_lock:
+        batch_jobs.update(loaded_batch_jobs)
+    # Re-enqueue unfinished items into worker queue
+    for b_id, b_data in batch_jobs.items():
+        if b_data.get("status") in ["RUNNING", "PENDING"]:
+            items = b_data.get("items", [])
+            for task_idx, item_obj in enumerate(items):
+                if item_obj.get("status") in ["QUEUED", "SIMULATING", "PENDING"]:
+                    item_obj["status"] = "QUEUED"
+                    job_queue.put((b_id, task_idx, item_obj))
+    print(f"[BATCH] Restored {len(batch_jobs)} batch jobs from disk, re-enqueued pending items into worker queue.")
 
 # Launch all 8 worker threads
 worker_threads = []
@@ -1191,9 +1226,8 @@ def enqueue_batch():
                     "result": None
                 }
                 batch_item_records.append(item_obj)
-                job_queue.put((batch_id, task_idx, item_obj))
                 task_idx += 1
-        
+
     batch_job_record = {
         "batch_id": batch_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -1207,8 +1241,16 @@ def enqueue_batch():
         "items": batch_item_records
     }
     
+    # 1. Register in batch_jobs FIRST under lock so worker threads find batch_id immediately
     with jobs_lock:
         batch_jobs[batch_id] = batch_job_record
+
+    # 2. Push all items to job_queue
+    for t_idx, item_obj in enumerate(batch_item_records):
+        job_queue.put((batch_id, t_idx, item_obj))
+
+    # 3. Save to disk in background thread to avoid blocking HTTP response
+    threading.Thread(target=save_batch_jobs, daemon=True).start()
         
     return jsonify({
         "success": True,
@@ -1243,6 +1285,7 @@ def cancel_batch():
                 for item in b_data.get("items", []):
                     if item.get("status") in ["QUEUED", "SIMULATING"]:
                         item["status"] = "CANCELLED"
+        save_batch_jobs()
 
     # 4. Reset all slots to IDLE
     with slot_lock:
@@ -1281,6 +1324,7 @@ def cancel_single_item():
             batch_jobs[batch_id]["progress"] = round((completed / total) * 100, 1)
             if completed == total:
                 batch_jobs[batch_id]["status"] = "CANCELLED"
+            save_batch_jobs()
             return jsonify({"success": True, "message": f"Item {item_index} in batch {batch_id} cancelled."})
         return jsonify({"success": False, "error": f"Item status is {item['status']}, cannot cancel"}), 400
 

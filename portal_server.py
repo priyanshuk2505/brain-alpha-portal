@@ -455,10 +455,24 @@ def _build_sim_payload(expression, settings):
         neut = "INDUSTRY"
         print(f"[SIM] Auto-corrected invalid RAM neutralization to INDUSTRY for region '{region}'")
 
+    raw_universe = str(settings.get("universe", "TOP3000")).strip()
+    # Auto-align universe if region and universe mismatch
+    if region == "USA" and any(raw_universe.startswith(prefix) for prefix in ["GLB_", "EUR_", "ASI_", "IND_", "CHN_", "KOR_", "HKG_", "DEU_", "GBR_"]):
+        raw_universe = "TOP3000"
+        print(f"[SIM] Auto-aligned universe for USA region to 'TOP3000'")
+    elif region == "EUR" and raw_universe == "TOP3000":
+        raw_universe = "EUR_TOP1000"
+    elif region == "ASI" and raw_universe == "TOP3000":
+        raw_universe = "ASI_TOP1000"
+    elif region == "IND" and raw_universe == "TOP3000":
+        raw_universe = "IND_TOP500"
+    elif region == "CHN" and raw_universe == "TOP3000":
+        raw_universe = "CHN_TOP1000"
+
     payload_settings = {
         "instrumentType": settings.get("instrumentType", "EQUITY"),
         "region": region,
-        "universe": settings.get("universe", "TOP3000"),
+        "universe": raw_universe,
         "delay": int(settings.get("delay", 1)),
         "decay": int(settings.get("decay", 0)),
         "neutralization": neut,
@@ -628,10 +642,20 @@ def run_single_simulation(expression, settings, dry_run=False):
             _update_rate_limits(resp.headers)
             print(f"[SIM] POST attempt {attempt+1}: HTTP {resp.status_code}")
 
-            if resp.status_code == 401:
-                print(f"[SIM] 401 Unauthorized — session expired or not authenticated. Cookie: {auth_state['cookie'][:40]}")
+            if resp.status_code in [401, 403]:
+                print(f"[SIM] HTTP {resp.status_code} Auth error — attempting auto-refresh using saved credentials...")
                 auth_state["authenticated"] = False
-                return {"status": "AUTH_EXPIRED", "error": "Session expired. Please re-login to WorldQuant BRAIN.", "hash": alpha_hash}
+                if auth_state.get("saved_email") and auth_state.get("saved_password"):
+                    ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
+                    if ok:
+                        print("[SIM] Auto-refresh succeeded! Retrying POST simulation...")
+                        session = get_brain_session()
+                        time.sleep(1)
+                        continue
+                    elif persona_url:
+                        return {"status": "FACE_REQUIRED", "error": "Face verification required. Please click 'Open Face Scan' in portal login modal.", "hash": alpha_hash}
+                formatted_err = format_brain_api_error(resp.text)
+                return {"status": f"HTTP_{resp.status_code}", "error": f"Session expired/forbidden (HTTP {resp.status_code}). Please click 'Sign In' or update Cookie.", "hash": alpha_hash}
 
             if resp.status_code == 429:
                 wait = int(resp.headers.get("Retry-After", backoff))

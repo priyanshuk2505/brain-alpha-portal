@@ -704,22 +704,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (batchesResp.ok) {
         const batches = await batchesResp.json();
-        const activeBatch = state.currentBatch
-          ? batches.find(b => b.batch_id === state.currentBatch)
-          : batches.find(b => b.status === 'RUNNING');
+        const activeBatch = batches.find(b => b.status === 'RUNNING') ||
+                            (state.currentBatch ? batches.find(b => b.batch_id === state.currentBatch) : null) ||
+                            (batches.length > 0 ? batches[0] : null);
 
         if (activeBatch) {
           showBatchProgress(activeBatch.progress, activeBatch.total, activeBatch.completed, activeBatch);
           updateQueueBadge(activeBatch);
-
-          if (activeBatch.status === 'COMPLETED' || activeBatch.status === 'CANCELLED') {
-            fetchResults();
+          if (activeBatch.batch_id) {
             fetchBatchDetails(activeBatch.batch_id);
           }
         } else if (batches.length === 0 || batches.every(b => !['RUNNING','PENDING'].includes(b.status))) {
           hideBatchProgress();
         }
       }
+
+      // Continuously fetch updated simulation results live while polling
+      await fetchResults();
     } catch (_) {}
   }
 
@@ -957,6 +958,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResultsTable() {
     const tbody = document.getElementById('resultsBody');
     const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const fStatus = document.getElementById('filterStatus')?.value || 'ALL';
     const fUniverse = (document.getElementById('filterUniverse')?.value || '').trim().toLowerCase();
     const fSharpe = document.getElementById('filterSharpe')?.value || 'ALL';
 

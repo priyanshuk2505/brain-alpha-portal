@@ -82,3 +82,234 @@ Sharpe: 1.3446, Fitness: 2.1939, Returns: 20.7800%, Margin(bps): 2.7600, Turnove
 Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(sigmoid(ts_delta(fnd45_sentiment_lm2_net_qa - fnd45_sentiment_lm2_net_pr, 504))), industry)), 5))
 Sharpe: 1.8751, Fitness: 1.3182, Returns: 28.4600%, Margin(bps): 1.2200, Turnover: 68.3200%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
 ------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_241
+Sharpe: 2.0000, Fitness: 1.0600, Returns: 11.0600%, Margin(bps): 5.6400, Turnover: 39.1800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_31
+Sharpe: 2.0200, Fitness: 1.0700, Returns: 11.4400%, Margin(bps): 5.6100, Turnover: 40.7800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_25
+Sharpe: 2.0600, Fitness: 1.1100, Returns: 10.6100%, Margin(bps): 5.7800, Turnover: 36.6800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_5
+Sharpe: 1.9400, Fitness: 1.0300, Returns: 10.4700%, Margin(bps): 5.5900, Turnover: 37.4600%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_techindi19_1
+Sharpe: 2.0200, Fitness: 1.0700, Returns: 11.1500%, Margin(bps): 5.6100, Turnover: 39.7600%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_techindi6_2
+Sharpe: 2.0100, Fitness: 1.0500, Returns: 11.0600%, Margin(bps): 5.4800, Turnover: 40.3500%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_techindi16_1
+Sharpe: 2.1400, Fitness: 1.1400, Returns: 11.8800%, Margin(bps): 5.6300, Turnover: 42.1800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_21
+Sharpe: 1.8700, Fitness: 1.0500, Returns: 9.3800%, Margin(bps): 6.2900, Turnover: 29.8400%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_one_day_return_techindi17_1
+Sharpe: 2.0800, Fitness: 1.1300, Returns: 11.7200%, Margin(bps): 5.8600, Turnover: 40.0000%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_241
+Sharpe: 1.9600, Fitness: 1.1900, Returns: 10.3700%, Margin(bps): 7.3600, Turnover: 28.1700%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_3
+Sharpe: 2.0100, Fitness: 1.1500, Returns: 9.6900%, Margin(bps): 6.5100, Turnover: 29.8000%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_25
+Sharpe: 2.1200, Fitness: 1.1400, Returns: 8.7300%, Margin(bps): 5.7800, Turnover: 30.1800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_tech17_1
+Sharpe: 2.0600, Fitness: 1.2600, Returns: 10.5600%, Margin(bps): 7.5000, Turnover: 28.1500%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_5
+Sharpe: 2.0000, Fitness: 1.1400, Returns: 9.2100%, Margin(bps): 6.4800, Turnover: 28.4000%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_techindi16_1
+Sharpe: 2.1200, Fitness: 1.2200, Returns: 9.9400%, Margin(bps): 6.6300, Turnover: 30.0000%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_techindi19_1
+Sharpe: 2.0700, Fitness: 1.2400, Returns: 10.0700%, Margin(bps): 7.1900, Turnover: 28.0300%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_18
+Sharpe: 2.2500, Fitness: 1.3300, Returns: 12.8700%, Margin(bps): 7.0000, Turnover: 36.7800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_second_quantile_ten_day_return_techindi6_2
+Sharpe: 2.1600, Fitness: 1.2700, Returns: 10.3200%, Margin(bps): 6.9000, Turnover: 29.9200%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return
+Sharpe: 2.0200, Fitness: 1.0400, Returns: 9.3900%, Margin(bps): 5.2700, Turnover: 35.6200%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_31
+Sharpe: 2.0600, Fitness: 1.0300, Returns: 8.8600%, Margin(bps): 5.0200, Turnover: 35.3100%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_241
+Sharpe: 2.0900, Fitness: 1.2100, Returns: 12.0000%, Margin(bps): 6.6500, Turnover: 36.0900%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_5
+Sharpe: 2.2700, Fitness: 1.3100, Returns: 11.8700%, Margin(bps): 6.6500, Turnover: 35.7200%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_4
+Sharpe: 2.2200, Fitness: 1.2700, Returns: 12.4000%, Margin(bps): 6.5600, Turnover: 37.8300%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_25
+Sharpe: 2.4900, Fitness: 1.3900, Returns: 11.4200%, Margin(bps): 6.1900, Turnover: 36.8800%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_techindi17_1
+Sharpe: 2.3600, Fitness: 1.4300, Returns: 13.2800%, Margin(bps): 7.3300, Turnover: 36.2200%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_techindi19_1
+Sharpe: 2.4000, Fitness: 1.4400, Returns: 12.9600%, Margin(bps): 7.1700, Turnover: 36.1300%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_techindi16_1
+Sharpe: 2.4200, Fitness: 1.4300, Returns: 12.9400%, Margin(bps): 7.0200, Turnover: 36.8400%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_five_day_return_techindi6_2
+Sharpe: 2.3700, Fitness: 1.3900, Returns: 12.5400%, Margin(bps): 6.8500, Turnover: 36.6100%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: predicted_third_quantile_one_day_return_21
+Sharpe: 2.0800, Fitness: 1.1200, Returns: 12.6800%, Margin(bps): 5.7600, Turnover: 44.0100%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(group_rank(rank(ts_mean(ts_backfill(predicted_second_quantile_ten_day_return_techindi6_2,20),20))*rank(ts_delta(ts_backfill(predicted_third_quantile_five_day_return_techindi19_1,60),60)),densify(exchange)),10))
+Sharpe: 1.9800, Fitness: 1.3200, Returns: 5.5600%, Margin(bps): 9.7300, Turnover: 11.4300%, Universe: TOP3000, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_131,20))-rank(ts_zscore(probability_third_bucket_five_day_label_zero_17,20))
+Sharpe: 3.6500, Fitness: 1.8200, Returns: 9.3300%, Margin(bps): 4.9500, Turnover: 37.7100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_zscore(probability_third_bucket_five_day_label_two_18,60))*rank(probability_third_bucket_five_day_label_two_17),subindustry)),3))
+Sharpe: 3.2200, Fitness: 1.9200, Returns: 9.7200%, Margin(bps): 7.1400, Turnover: 27.2100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_zscore(probability_third_bucket_five_day_label_two_18,60))*rank(probability_third_bucket_five_day_label_two_17),subindustry)),3))
+Sharpe: 3.2200, Fitness: 1.9200, Returns: 9.7200%, Margin(bps): 7.1400, Turnover: 27.2100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_third_bucket_five_day_label_two_18/(probability_third_bucket_five_day_label_one_16+0.0001),106)
+Sharpe: 2.9000, Fitness: 1.5200, Returns: 7.7600%, Margin(bps): 5.5000, Turnover: 28.2400%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_131,120))-rank(ts_zscore(probability_second_bucket_one_day_label_zero_17,20))
+Sharpe: 4.0300, Fitness: 2.1800, Returns: 11.8200%, Margin(bps): 5.8700, Turnover: 40.2600%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_neutralize(ts_rank(probability_second_bucket_ten_day_label_one_17,60)-ts_rank(probability_second_bucket_one_day_label_zero_18,5),industry)
+Sharpe: 4.2500, Fitness: 1.9200, Returns: 12.0700%, Margin(bps): 4.0800, Turnover: 59.1700%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_zscore(ts_rank(probability_third_bucket_one_day_label_two_15/(probability_second_bucket_one_day_label_zero_17+0.0001),252),industry)
+Sharpe: 3.8600, Fitness: 2.1100, Returns: 13.4400%, Margin(bps): 5.9700, Turnover: 45.0600%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_second_quantile_ten_day_bucket_one_131/(probability_second_bucket_one_day_label_zero_15+0.0001),252)
+Sharpe: 4.3400, Fitness: 2.5300, Returns: 13.4700%, Margin(bps): 6.8200, Turnover: 39.5200%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_third_bucket_one_day_label_two_15,5)+ts_rank(probability_second_quantile_ten_day_bucket_one_13,30)
+Sharpe: 4.2600, Fitness: 1.9700, Returns: 12.3200%, Margin(bps): 4.2800, Turnover: 57.6000%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: zscore(group_neutralize(rank(ts_mean(probability_third_bucket_five_day_label_one_17,106))-rank(ts_mean(probability_second_quantile_ten_day_bucket_zero_15,10)),industry))
+Sharpe: 1.5500, Fitness: 1.1500, Returns: 6.8900%, Margin(bps): 14.3200, Turnover: 9.6100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: zscore(group_neutralize(rank(ts_mean(probability_second_quantile_ten_day_bucket_one_141,5))-rank(ts_mean(probability_second_bucket_ten_day_label_zero_17,90)),industry))
+Sharpe: 1.9500, Fitness: 1.2800, Returns: 6.2400%, Margin(bps): 8.5600, Turnover: 14.5800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_second_quantile_five_day_bucket_one_141/(probability_second_bucket_one_day_label_zero_18+0.0001),60)
+Sharpe: 4.4200, Fitness: 2.4100, Returns: 13.1800%, Margin(bps): 5.9500, Turnover: 44.2800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_neutralize(ts_rank(probability_second_quantile_one_day_bucket_one_131,20)-ts_rank(probability_third_bucket_one_day_label_one_16,5),industry)
+Sharpe: 3.1500, Fitness: 1.2600, Returns: 9.4200%, Margin(bps): 3.1900, Turnover: 59.0800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_zscore(ts_rank(probability_second_quantile_five_day_bucket_one_14/(probability_third_bucket_five_day_label_one_17+0.0001),60),industry)
+Sharpe: 2.7400, Fitness: 1.3400, Returns: 7.2000%, Margin(bps): 4.7600, Turnover: 30.2700%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_third_bucket_five_day_label_two_17,60)+ts_rank(probability_second_bucket_one_day_label_one_15,62)
+Sharpe: 4.0800, Fitness: 2.2000, Returns: 12.7100%, Margin(bps): 5.8000, Turnover: 43.8300%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_one_day_bucket_one_14,5))-rank(ts_zscore(probability_second_quantile_five_day_bucket_zero_14,20))
+Sharpe: 4.2500, Fitness: 1.8900, Returns: 12.0400%, Margin(bps): 3.9500, Turnover: 60.9700%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: power(rank(probability_second_bucket_ten_day_label_one_16/(probability_second_quantile_ten_day_bucket_zero_13+0.0001)),2)
+Sharpe: 4.1800, Fitness: 2.6500, Returns: 12.0800%, Margin(bps): 8.0200, Turnover: 30.1200%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_one_day_bucket_one_13,60))-rank(ts_zscore(probability_third_bucket_five_day_label_one_17,5))
+Sharpe: 3.3200, Fitness: 1.4300, Returns: 10.1800%, Margin(bps): 3.7100, Turnover: 54.9000%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_14,106))-rank(ts_zscore(probability_second_quantile_five_day_bucket_zero_13,30))
+Sharpe: 4.8800, Fitness: 2.9000, Returns: 13.3900%, Margin(bps): 7.0500, Turnover: 38.0000%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: zscore(group_neutralize(rank(ts_mean(probability_second_bucket_ten_day_label_one_15,30))-rank(ts_mean(probability_second_bucket_one_day_label_zero_17,20)),industry))
+Sharpe: 2.0700, Fitness: 1.4900, Returns: 6.5200%, Margin(bps): 15.3800, Turnover: 8.4800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_second_bucket_ten_day_label_one_16,120)+ts_rank(probability_second_bucket_one_day_label_one_15,180)
+Sharpe: 3.6900, Fitness: 1.9600, Returns: 10.9100%, Margin(bps): 5.6700, Turnover: 38.5100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_neutralize(ts_rank(probability_second_bucket_ten_day_label_one_15,60)-ts_rank(probability_second_bucket_ten_day_label_zero_16,30),industry)
+Sharpe: 3.6700, Fitness: 1.8900, Returns: 9.1400%, Margin(bps): 5.3300, Turnover: 34.3100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: power(rank(probability_second_quantile_five_day_bucket_one_142/(probability_third_bucket_five_day_label_zero_17+0.0001)),2)
+Sharpe: 2.2700, Fitness: 1.2500, Returns: 8.1400%, Margin(bps): 6.0400, Turnover: 26.9300%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_13,252))-rank(ts_zscore(probability_second_quantile_five_day_bucket_zero_14,180))
+Sharpe: 5.0800, Fitness: 3.2400, Returns: 14.3900%, Margin(bps): 8.1200, Turnover: 35.4600%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: power(rank(probability_second_quantile_five_day_bucket_one_141/(probability_second_quantile_ten_day_bucket_zero_15+0.0001)),2)
+Sharpe: 5.1400, Fitness: 3.4200, Returns: 14.9800%, Margin(bps): 8.8600, Turnover: 33.8300%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_third_bucket_five_day_label_two_18/(probability_third_bucket_five_day_label_zero_15+0.0001),106)
+Sharpe: 4.6300, Fitness: 2.6800, Returns: 12.6200%, Margin(bps): 6.7200, Turnover: 37.5300%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_zscore(probability_second_quantile_five_day_bucket_one_141,252))*rank(probability_second_quantile_five_day_bucket_one_142),subindustry)),3))
+Sharpe: 3.8000, Fitness: 2.2200, Returns: 9.8900%, Margin(bps): 6.8400, Turnover: 28.9100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: power(rank(probability_second_quantile_ten_day_bucket_one_131/(probability_second_quantile_five_day_bucket_one_142+0.0001)),2)
+Sharpe: 3.3900, Fitness: 1.8000, Returns: 9.2900%, Margin(bps): 5.6500, Turnover: 32.9000%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_141,5))-rank(ts_zscore(probability_second_quantile_five_day_bucket_zero_13,180))
+Sharpe: 4.3300, Fitness: 2.1400, Returns: 12.5500%, Margin(bps): 4.9000, Turnover: 51.2800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_third_bucket_five_day_label_two_18,252)+ts_rank(probability_third_bucket_five_day_label_two_18,30)
+Sharpe: 3.8300, Fitness: 2.0700, Returns: 11.1000%, Margin(bps): 5.8600, Turnover: 37.8800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: power(rank(probability_second_quantile_ten_day_bucket_one_13/(probability_second_quantile_one_day_bucket_zero_141+0.0001)),2)
+Sharpe: 4.3600, Fitness: 2.7700, Returns: 13.5000%, Margin(bps): 8.0700, Turnover: 33.4700%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_14,5))*rank(probability_third_bucket_one_day_label_two_15),subindustry)),3))
+Sharpe: 3.5300, Fitness: 1.8200, Returns: 11.1000%, Margin(bps): 5.3400, Turnover: 41.5300%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_third_bucket_one_day_label_two_15,120))-rank(ts_zscore(probability_second_quantile_ten_day_bucket_zero_14,180))
+Sharpe: 5.0200, Fitness: 3.0400, Returns: 15.0400%, Margin(bps): 7.3100, Turnover: 41.1400%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_zscore(ts_rank(probability_third_bucket_five_day_label_two_18/(probability_second_bucket_one_day_label_one_16+0.0001),106),industry)
+Sharpe: 3.0700, Fitness: 1.5300, Returns: 8.1700%, Margin(bps): 4.9800, Turnover: 32.8100%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_bucket_one_day_label_one_16,252))-rank(ts_zscore(probability_second_quantile_ten_day_bucket_zero_15,20))
+Sharpe: 3.9300, Fitness: 2.1200, Returns: 12.0600%, Margin(bps): 5.8300, Turnover: 41.4000%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_zscore(ts_rank(probability_second_quantile_five_day_bucket_one_141/(probability_second_quantile_one_day_bucket_zero_131+0.0001),5),industry)
+Sharpe: 3.5100, Fitness: 1.3200, Returns: 10.3200%, Margin(bps): 2.8300, Turnover: 72.9500%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_second_quantile_five_day_bucket_one_141,5)+ts_rank(probability_second_quantile_five_day_bucket_one_142,5)
+Sharpe: 2.8800, Fitness: 1.0300, Returns: 8.4000%, Margin(bps): 2.5700, Turnover: 65.4700%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_zscore(probability_third_bucket_one_day_label_one_16,5))*rank(probability_second_quantile_one_day_bucket_one_14),subindustry)),3))
+Sharpe: 2.9400, Fitness: 1.2600, Returns: 7.5000%, Margin(bps): 3.6600, Turnover: 40.9600%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_second_quantile_ten_day_bucket_zero_141/(probability_second_quantile_one_day_bucket_zero_14+0.0001),252)
+Sharpe: 3.3700, Fitness: 1.5100, Returns: 9.2300%, Margin(bps): 4.0000, Turnover: 46.1800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_zscore(ts_rank(probability_second_bucket_one_day_label_one_15/(probability_third_bucket_one_day_label_one_15+0.0001),106),industry)
+Sharpe: 2.3400, Fitness: 1.0800, Returns: 6.6600%, Margin(bps): 4.2700, Turnover: 31.2200%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_third_bucket_five_day_label_one_15,5))-rank(ts_zscore(probability_second_quantile_five_day_bucket_zero_131,180))
+Sharpe: 3.7400, Fitness: 1.7100, Returns: 9.7700%, Margin(bps): 4.1800, Turnover: 46.7800%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: zscore(group_neutralize(rank(ts_mean(probability_third_bucket_one_day_label_two_15,60))-rank(ts_mean(probability_second_quantile_ten_day_bucket_zero_14,15)),industry))
+Sharpe: 1.6400, Fitness: 1.1500, Returns: 6.1300%, Margin(bps): 12.8300, Turnover: 9.5500%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: group_neutralize(ts_rank(probability_second_quantile_ten_day_bucket_one_141,252)-ts_rank(probability_second_bucket_ten_day_label_zero_17,180),industry)
+Sharpe: 3.9100, Fitness: 2.2100, Returns: 10.4600%, Margin(bps): 6.4100, Turnover: 32.6400%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: power(rank(probability_second_quantile_five_day_bucket_one_141/(probability_second_quantile_ten_day_bucket_zero_13+0.0001)),2)
+Sharpe: 4.8100, Fitness: 3.1600, Returns: 14.2800%, Margin(bps): 8.6100, Turnover: 33.1900%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: rank(ts_zscore(probability_second_quantile_one_day_bucket_one_13,106))-rank(ts_zscore(probability_second_quantile_ten_day_bucket_zero_15,20))
+Sharpe: 4.3900, Fitness: 2.3700, Returns: 13.1700%, Margin(bps): 5.8400, Turnover: 45.0700%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: ts_rank(probability_third_bucket_one_day_label_one_17,30)+ts_rank(probability_second_quantile_ten_day_bucket_one_13,30)
+Sharpe: 2.4100, Fitness: 1.0200, Returns: 6.0600%, Margin(bps): 3.5800, Turnover: 33.8900%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------
+Code: normalize(ts_decay_linear(zscore(group_neutralize(rank(ts_zscore(probability_second_quantile_ten_day_bucket_one_14,252))*rank(probability_second_quantile_ten_day_bucket_one_14),subindustry)),3))
+Sharpe: 4.4600, Fitness: 2.8000, Returns: 10.4300%, Margin(bps): 7.8900, Turnover: 26.4400%, Universe: TOP2500, Delay: 1, Neutralization: INDUSTRY
+------------------------------------------------------------

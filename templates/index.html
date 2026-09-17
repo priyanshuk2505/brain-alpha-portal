@@ -217,18 +217,33 @@ rank(ts_mean(volume, 5)) - rank(ts_mean(volume, 20))"></textarea>
             </div>
 
             <div class="setting-row full">
-              <label class="setting-label">UNIVERSE <i class="fa-solid fa-circle-info info-tip" title="Instrument universe"></i></label>
-              <select id="sUniverse" class="field-select">
-                <option value="ALL_UNIVERSES">🌐 Sweep All Universes (3000, 2000, 1000, 500, 200)</option>
-                <option value="TOP3000" selected>TOP3000</option>
+              <label class="setting-label">UNIVERSE <i class="fa-solid fa-circle-info info-tip" title="Enter universe manually or choose suggestions (e.g. TOP3000, GLB_TOP3000, EUR_TOP1000, or comma-separated list)"></i></label>
+              <input type="text" id="sUniverse" class="field-input" value="TOP3000" placeholder="e.g. TOP3000, GLB_TOP3000, EUR_TOP1000..." list="universeDatalist" autocomplete="off">
+              <datalist id="universeDatalist">
+                <option value="TOP3000">TOP3000 (USA / Standard)</option>
+                <option value="TOP2000">TOP2000 (USA)</option>
+                <option value="TOP1000">TOP1000 (USA)</option>
+                <option value="TOP500">TOP500 (USA)</option>
+                <option value="TOP200">TOP200 (USA)</option>
+                <option value="GLB_TOP3000">GLB_TOP3000 (Global)</option>
+                <option value="EUR_TOP1000">EUR_TOP1000 (Europe)</option>
+                <option value="ASI_TOP1000">ASI_TOP1000 (Asia)</option>
+                <option value="IND_TOP500">IND_TOP500 (India)</option>
+                <option value="CHN_TOP1000">CHN_TOP1000 (China)</option>
                 <option value="MINVOL1M">MINVOL1M</option>
                 <option value="MINVOL10M">MINVOL10M</option>
                 <option value="TOPDIV3000">TOPDIV3000</option>
-                <option value="TOP2000">TOP2000</option>
-                <option value="TOP1000">TOP1000</option>
-                <option value="TOP500">TOP500</option>
-                <option value="TOP200">TOP200</option>
-              </select>
+                <option value="ALL_UNIVERSES">ALL_UNIVERSES (Sweep 3000, 2000, 1000, 500, 200)</option>
+              </datalist>
+              <div class="univ-quick-chips">
+                <span class="chip-label">Quick:</span>
+                <button type="button" class="univ-chip" data-univ="TOP3000">TOP3000</button>
+                <button type="button" class="univ-chip" data-univ="TOP1000">TOP1000</button>
+                <button type="button" class="univ-chip" data-univ="TOP500">TOP500</button>
+                <button type="button" class="univ-chip" data-univ="GLB_TOP3000">GLB_TOP3000</button>
+                <button type="button" class="univ-chip" data-univ="EUR_TOP1000">EUR_TOP1000</button>
+                <button type="button" class="univ-chip" data-univ="ALL_UNIVERSES">🌐 Sweep All</button>
+              </div>
             </div>
 
             <div class="setting-row full">

@@ -1128,9 +1128,13 @@ def enqueue_batch():
         return jsonify({"error": "No valid expressions provided"}), 400
 
     # Expand Multi-Universe and Multi-Neutralization selections if requested
-    target_universes = [settings.get("universe", "TOP3000")]
-    if settings.get("universe") == "ALL_UNIVERSES":
+    raw_univ = str(settings.get("universe", "TOP3000")).strip()
+    if raw_univ == "ALL_UNIVERSES":
         target_universes = ["TOP3000", "TOP2000", "TOP1000", "TOP500", "TOP200"]
+    elif "," in raw_univ:
+        target_universes = [u.strip() for u in raw_univ.split(",") if u.strip()]
+    else:
+        target_universes = [raw_univ if raw_univ else "TOP3000"]
 
     target_neut = [settings.get("neutralization", "INDUSTRY")]
     if settings.get("neutralization") == "ALL_NEUT":

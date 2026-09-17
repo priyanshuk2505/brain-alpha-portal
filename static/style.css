@@ -398,6 +398,42 @@ body {
   text-align: center;
   width: 100%;
 }
+.univ-quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.univ-quick-chips .chip-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.univ-chip {
+  padding: 4px 9px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.univ-chip:hover {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: var(--border-accent);
+  color: var(--accent-cyan);
+}
+.univ-chip.active {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  font-weight: 600;
+}
 .password-wrap { position: relative; }
 .pass-toggle {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);

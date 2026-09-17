@@ -458,6 +458,42 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
+    // Universe Quick Chips
+    document.querySelectorAll('.univ-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const val = chip.getAttribute('data-univ');
+        const input = document.getElementById('sUniverse');
+        if (input) input.value = val;
+        document.querySelectorAll('.univ-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+
+    // Region change auto-suggest standard universe
+    const regionEl = document.getElementById('sRegion');
+    if (regionEl) {
+      const regionDefaults = {
+        USA: 'TOP3000',
+        GLB: 'TOP3000',
+        EUR: 'EUR_TOP1000',
+        ASI: 'ASI_TOP1000',
+        IND: 'IND_TOP500',
+        CHN: 'CHN_TOP1000',
+        KOR: 'KOR_TOP500',
+        HKG: 'HKG_TOP500',
+        DEU: 'DEU_TOP500',
+        GBR: 'GBR_TOP500'
+      };
+      regionEl.addEventListener('change', () => {
+        const selectedRegion = regionEl.value;
+        const univInput = document.getElementById('sUniverse');
+        if (univInput && regionDefaults[selectedRegion]) {
+          univInput.value = regionDefaults[selectedRegion];
+          toast(`Updated default universe for ${selectedRegion} to ${regionDefaults[selectedRegion]}`, 'info');
+        }
+      });
+    }
+
     // Exports
     document.getElementById('exportCsvBtn').addEventListener('click', () => { window.location.href = '/api/export/csv'; });
     document.getElementById('exportEliteBtn').addEventListener('click', () => { window.location.href = '/api/export/elite'; });

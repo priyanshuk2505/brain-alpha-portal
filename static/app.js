@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bindLoginEvents();
     bindMainEvents();
     loadDefaultSettings();
+    enterMainApp();
     checkAuthOnLoad();
   }
 
@@ -275,20 +276,17 @@ document.addEventListener('DOMContentLoaded', () => {
         state.authenticated = true;
         state.userEmail = data.user_email;
         if (data.rate_limit) state.lastRateLimit = data.rate_limit;
-        enterMainApp();
-      } else if (data.details && data.details.startsWith('FACE_REQUIRED:')) {
-        // JWT expired, auto-refresh tried, but needs face scan
-        // Pre-fill persona URL and show face scan step automatically
-        state.personaUrl = data.details.replace('FACE_REQUIRED:', '');
-        showLoginStep('loginStepFaceId');
-        const statusEl = document.getElementById('faceVerifyStatus');
-        statusEl.textContent = 'Your session expired. Complete face scan to re-authenticate automatically.';
-        statusEl.style.display = 'block';
-        toast('Session expired — complete face scan to continue.', 'warning');
-        pollPersonaAuth();
+        updateAuthBadge(true, state.userEmail);
+      } else {
+        updateAuthBadge(false, 'Auth Required');
+        if (data.details && data.details.startsWith('FACE_REQUIRED:')) {
+          state.personaUrl = data.details.replace('FACE_REQUIRED:', '');
+          toast('Face scan required for launching new simulations. Click key icon to authenticate.', 'warning');
+        }
       }
-      // else: stay on login screen
-    } catch (_) {}
+    } catch (_) {
+      updateAuthBadge(false, 'Connecting...');
+    }
   }
 
   async function checkAuthAndProceed() {
@@ -403,6 +401,12 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(`/api/simulations/batch/${state.currentBatch}/csv`, '_blank');
       });
     }
+
+    // Open login overlay from badge
+    document.getElementById('authBadge').addEventListener('click', () => {
+      const overlay = document.getElementById('loginOverlay');
+      overlay.style.display = overlay.style.display === 'flex' ? 'none' : 'flex';
+    });
 
     // Open session modal
     document.getElementById('openSettingsCredBtn').addEventListener('click', () => {

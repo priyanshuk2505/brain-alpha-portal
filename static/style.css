@@ -538,6 +538,8 @@ body {
   border-radius: 20px;
   font-size: 0.75rem; font-weight: 500;
   border: 1px solid;
+  cursor: pointer;
+  transition: all var(--transition);
 }
 .auth-badge-ok {
   background: rgba(0,230,118,0.08);

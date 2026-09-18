@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 Dedicated Region-Agnostic (GLB TOP3000) Simulation Processor
-Extracts top Alphas (|Sharpe| >= 2.0), flips negative signs if Sharpe < 0,
-runs GLB region-agnostic simulations on dedicated Slot 8, and logs results to region_agnostic_alpha_results.csv.
+Extracts Super-Elite Alphas matching strict criteria:
+  - Original Sharpe > 3.0  => Keep formula as is
+  - Original Sharpe < -3.0 => Multiply by -1 * (expression)
+Assigns to Dedicated Slot 8 and logs results to region_agnostic_alpha_results.csv.
 """
 
 import os
@@ -15,7 +17,7 @@ WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
 BATCH_JOBS_FILE = os.path.join(WORKSPACE_DIR, "batch_jobs.json")
 REGION_AGNOSTIC_CSV = os.path.join(WORKSPACE_DIR, "region_agnostic_alpha_results.csv")
 
-def extract_best_alphas(min_sharpe=2.0):
+def extract_strict_super_elite_alphas():
     alphas = []
     seen = set()
 
@@ -32,8 +34,9 @@ def extract_best_alphas(min_sharpe=2.0):
                 expr = code_m.group(1).strip()
                 try:
                     s_val = float(sharpe_m.group(1))
-                    if abs(s_val) >= min_sharpe:
-                        final_expr = f"-1 * ({expr})" if s_val < 0 else expr
+                    # Strict Filter: Sharpe > 3.0 OR Sharpe < -3.0
+                    if s_val > 3.0 or s_val < -3.0:
+                        final_expr = f"-1 * ({expr})" if s_val < -3.0 else expr
                         key = final_expr.replace(" ", "")
                         if key not in seen:
                             seen.add(key)
@@ -52,8 +55,9 @@ def extract_best_alphas(min_sharpe=2.0):
                     expr = row[10].strip()
                     try:
                         s_val = float(row[2])
-                        if abs(s_val) >= min_sharpe:
-                            final_expr = f"-1 * ({expr})" if s_val < 0 else expr
+                        # Strict Filter: Sharpe > 3.0 OR Sharpe < -3.0
+                        if s_val > 3.0 or s_val < -3.0:
+                            final_expr = f"-1 * ({expr})" if s_val < -3.0 else expr
                             key = final_expr.replace(" ", "")
                             if key not in seen:
                                 seen.add(key)
@@ -66,11 +70,11 @@ def extract_best_alphas(min_sharpe=2.0):
     return alphas
 
 def create_region_agnostic_batch():
-    best_alphas = extract_best_alphas(min_sharpe=2.0)
-    print(f"[REGION-AGNOSTIC] Found {len(best_alphas)} top Alphas with |Sharpe| >= 2.0")
+    super_elites = extract_strict_super_elite_alphas()
+    print(f"[REGION-AGNOSTIC] Found {len(super_elites)} Super-Elite Alphas with strict |Sharpe| > 3.0 (Sharpe > 3.0 or Sharpe < -3.0)")
 
     items = []
-    for idx, item in enumerate(best_alphas):
+    for idx, item in enumerate(super_elites):
         expr = item["final_expr"]
         items.append({
             "expression": expr,
@@ -99,7 +103,7 @@ def create_region_agnostic_batch():
     batch_id = "BATCH_REGION_AGNOSTIC_GLB"
     batch_data = {
         "batch_id": batch_id,
-        "name": "Region Agnostic GLB TOP3000 Dedicated Batch (Slot 8)",
+        "name": "Region Agnostic GLB TOP3000 Super-Elite Batch (Slot 8)",
         "region": "GLB",
         "universe": "TOP3000",
         "delay": 1,
@@ -131,7 +135,7 @@ def create_region_agnostic_batch():
             w = csv.writer(f)
             w.writerow(["Index", "OriginalSharpe", "GLB_Sharpe", "GLB_Fitness", "GLB_Returns(%)", "GLB_Margin(bps)", "GLB_Turnover(%)", "FailedChecks", "PassFail", "AlphaID", "Expression"])
 
-    print(f"[REGION-AGNOSTIC] Created batch '{batch_id}' with {len(items)} items assigned to Slot 8.")
+    print(f"[REGION-AGNOSTIC] Created batch '{batch_id}' with {len(items)} Super-Elite items assigned to Slot 8.")
     return batch_id
 
 if __name__ == "__main__":

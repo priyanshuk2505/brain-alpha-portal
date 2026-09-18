@@ -1148,6 +1148,7 @@ def get_rate_limit():
 @app.route("/api/health", methods=["GET"])
 def get_system_health():
     """System health endpoint for background platform and WorldQuant error monitoring."""
+    is_auth, details = check_auth_status()
     with jobs_lock:
         remaining = 0
         running = 0
@@ -1160,14 +1161,15 @@ def get_system_health():
                     remaining += max(0, tot - comp)
 
     return jsonify({
-        "status": "OK" if auth_state.get("authenticated") else "AUTH_REQUIRED",
-        "authenticated": bool(auth_state.get("authenticated")),
+        "status": "OK" if is_auth else "AUTH_REQUIRED",
+        "authenticated": is_auth,
         "user_email": auth_state.get("user_email"),
         "pending_persona_url": auth_state.get("pending_persona_url"),
         "remaining_queue": remaining,
         "running_batches": running,
         "rate_limit": rate_limit_state
     })
+
 
 @app.route("/api/results/region-agnostic", methods=["GET"])
 def get_region_agnostic_results():

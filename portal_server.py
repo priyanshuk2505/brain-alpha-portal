@@ -1212,12 +1212,20 @@ def complete_persona():
             # 403 = face scan not yet completed in the browser
             return jsonify({"success": False, "message": "Face scan not completed yet (403). Please finish the scan in the browser tab first, then click Verify."}), 403
 
-        elif resp.status_code == 409:
-            # 409 = inquiry already used — re-try full login
+        elif resp.status_code in [409, 410]:
+            # 409/410 = inquiry expired or already used — generate fresh inquiry ID
+            print(f"[PERSONA] Inquiry {api_url} returned HTTP {resp.status_code}. Generating fresh inquiry ID...")
             ok, msg, inq, purl = authenticate_brain_user(email, password)
             if ok:
-                return jsonify({"success": True, "message": "Authenticated.", "user_email": auth_state["user_email"]})
-            return jsonify({"success": False, "message": f"Session conflict (409). Try logging in again. {msg}"})
+                auth_pause_event.set()
+                return jsonify({"success": True, "message": "Authenticated successfully.", "user_email": auth_state["user_email"]})
+            return jsonify({
+                "success": False,
+                "requires_persona": True,
+                "persona_url": purl,
+                "message": f"Previous Face ID inquiry expired. Please scan using the fresh link."
+            })
+
 
         else:
             return jsonify({"success": False, "message": f"Unexpected response from BRAIN: HTTP {resp.status_code} — {resp.text[:200]}"}), 400

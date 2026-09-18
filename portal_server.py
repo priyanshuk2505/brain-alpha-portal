@@ -1017,12 +1017,44 @@ if loaded_batch_jobs:
                     job_queue.put((b_id, task_idx, item_obj))
     print(f"[BATCH] Restored {len(batch_jobs)} batch jobs from disk, re-enqueued pending items into worker queue.")
 
+def auto_replenish_loop():
+    """Background daemon thread to auto-replenish queue with 1,000 Alphas whenever remaining queue < 1,000."""
+    while True:
+        try:
+            time.sleep(60)
+            with jobs_lock:
+                remaining_total = 0
+                for b in batch_jobs.values():
+                    if isinstance(b, dict) and b.get("status") in ["RUNNING", "PENDING"]:
+                        tot = b.get("total", 0)
+                        comp = b.get("completed", 0)
+                        remaining_total += max(0, tot - comp)
+                
+                if remaining_total < 1000:
+                    print(f"[AUTO-REPLENISH] Queue low ({remaining_total} remaining). Generating 1,000 new Alphas...")
+                    from auto_replenish import create_batch
+                    for _ in range(2):
+                        b_id, b_data = create_batch(500)
+                        batch_jobs[b_id] = b_data
+                        items = b_data.get("items", [])
+                        for task_idx, item_obj in enumerate(items):
+                            job_queue.put((b_id, task_idx, item_obj))
+                        print(f"[AUTO-REPLENISH] Added and enqueued batch {b_id}: {b_data['name']}")
+                    save_batch_jobs()
+        except Exception as e:
+            print(f"[AUTO-REPLENISH] Error: {e}")
+
+# Launch Auto-Replenish background daemon thread
+t_replenish = threading.Thread(target=auto_replenish_loop, daemon=True)
+t_replenish.start()
+
 # Launch all 8 worker threads
 worker_threads = []
 for _slot_id in range(MAX_CONCURRENT_SIMS):
     t = threading.Thread(target=worker_slot, args=(_slot_id,), daemon=True)
     t.start()
     worker_threads.append(t)
+
 
 
 

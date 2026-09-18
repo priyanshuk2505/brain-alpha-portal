@@ -526,7 +526,7 @@ def _build_sim_payload(expression, settings):
         "regular": expression.strip()
     }
 
-def _poll_simulation(session, status_url, alpha_hash, universe, decay):
+def _poll_simulation(session, status_url, alpha_hash, universe, decay, slot_id=None):
     """Poll a simulation URL until complete. Returns result dict."""
     poll_count = 0
     cache = load_cache()
@@ -548,18 +548,13 @@ def _poll_simulation(session, status_url, alpha_hash, universe, decay):
 
             data = poll_resp.json()
             retry_after = poll_resp.headers.get("Retry-After")
-
-            # Still running
-            if retry_after and float(retry_after) > 0:
-                wait = max(float(retry_after), 2)
-                time.sleep(wait)
-                poll_count += 1
-                continue
-
-            # Check status field & progress
             status = data.get("status", "")
             progress = data.get("progress", 0)
             alpha_id = data.get("alpha")
+
+            if slot_id is not None and slot_id in slot_status:
+                with slot_lock:
+                    slot_status[slot_id]["progress_pct"] = f"{round(float(progress) * 100, 1)}%"
 
             if status in ["COMPLETE", "WARNING"] or progress == 1.0 or (alpha_id and isinstance(alpha_id, str) and progress == 0 and not status):
                 failed_checks = []
@@ -603,7 +598,13 @@ def _poll_simulation(session, status_url, alpha_hash, universe, decay):
                 return {"status": status, "error": err, "failed_checks": [], "hash": alpha_hash}
 
             # Status is WAITING or SIMULATING — keep polling
-            time.sleep(3)
+            wait_time = 3
+            if retry_after:
+                try:
+                    wait_time = max(float(retry_after), 2)
+                except Exception:
+                    pass
+            time.sleep(wait_time)
             poll_count += 1
 
         except Exception as e:
@@ -613,7 +614,7 @@ def _poll_simulation(session, status_url, alpha_hash, universe, decay):
 
     return {"status": "TIMEOUT", "error": "Exceeded 300 polling attempts", "hash": alpha_hash}
 
-def run_single_simulation(expression, settings, dry_run=False):
+def run_single_simulation(expression, settings, dry_run=False, slot_id=None):
     alpha_hash = get_alpha_hash(expression, settings)
     cache = load_cache()
     universe = settings.get("universe", "TOP3000")
@@ -736,7 +737,7 @@ def run_single_simulation(expression, settings, dry_run=False):
         status_url = "https://api.worldquantbrain.com" + status_url
 
     print(f"[SIM] Polling: {status_url}")
-    return _poll_simulation(session, status_url, alpha_hash, universe, decay)
+    return _poll_simulation(session, status_url, alpha_hash, universe, decay, slot_id=slot_id)
 
 def submit_alpha_to_brain(alpha_id, dry_run=False):
     if dry_run or alpha_id.startswith("MOCK_"):
@@ -1005,7 +1006,7 @@ def worker_slot(slot_id):
                     batch_jobs[batch_id]["items"][item_index]["slot"] = slot_id + 1
                     batch_jobs[batch_id]["items"][item_index]["start_time"] = datetime.now(timezone.utc).isoformat()
 
-            res = run_single_simulation(expression, settings, dry_run=dry_run)
+            res = run_single_simulation(expression, settings, dry_run=dry_run, slot_id=slot_id)
 
             # Auto-submit check
             metrics = res.get("metrics") or {}

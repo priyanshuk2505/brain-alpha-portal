@@ -670,33 +670,30 @@ def run_single_simulation(expression, settings, dry_run=False):
             print(f"[SIM] POST attempt {attempt+1}: HTTP {resp.status_code}")
 
             if resp.status_code in [401, 403]:
-                print(f"[SIM] HTTP {resp.status_code} Auth error — attempting auto-refresh using saved credentials...")
+                print(f"[SIM] HTTP {resp.status_code} Auth error — IMMEDIATELY PAUSING ALL WORKER SLOTS (0 WQ REQUESTS)...")
                 auth_state["authenticated"] = False
+                auth_pause_event.clear()  # INSTANTLY FREEZE ALL 8 WORKER THREADS
+
+                # Attempt background auto-refresh with saved credentials
                 if auth_state.get("saved_email") and auth_state.get("saved_password"):
                     ok, msg, inquiry_id, persona_url = authenticate_brain_user(auth_state["saved_email"], auth_state["saved_password"])
                     if ok:
-                        print("[SIM] Auto-refresh succeeded! Retrying POST simulation...")
+                        print("[SIM] Auto-refresh succeeded! Unpausing worker threads...")
+                        auth_state["authenticated"] = True
+                        auth_pause_event.set()
                         session = get_brain_session()
                         time.sleep(1)
                         continue
                     elif persona_url:
                         auth_state["pending_persona_url"] = persona_url
-                        print(f"[SIM] Face verification required ({persona_url}). Waiting 15s for user to complete scan...")
-                        time.sleep(15)
-                        session = get_brain_session()
-                        if auth_state.get("authenticated"):
-                            continue
+                        print(f"[SIM] Face verification required ({persona_url}). Workers 100% frozen until user completes Face ID scan.")
 
-                print(f"[SIM] Session expired (HTTP {resp.status_code}). Pausing worker thread for 15s waiting for re-login...")
-                time.sleep(15)
+                # Block worker thread completely until user completes Face ID & calls auth_pause_event.set()
+                print("[SIM] Worker slot waiting on auth_pause_event...")
+                auth_pause_event.wait()
                 session = get_brain_session()
-                if auth_state.get("authenticated"):
-                    continue
-
-                if attempt == 2:
-                    formatted_err = format_brain_api_error(resp.text)
-                    return {"status": f"HTTP_{resp.status_code}", "error": f"Session expired/forbidden (HTTP {resp.status_code}). Please click 'Sign In' or update Cookie.", "hash": alpha_hash}
                 continue
+
 
             if resp.status_code == 429:
                 wait = int(resp.headers.get("Retry-After", backoff))
@@ -1190,6 +1187,7 @@ def complete_persona():
                 _apply_session_cookie(cookie_str)
 
             auth_state["authenticated"] = True
+            auth_pause_event.set()  # UNPAUSE ALL WORKER THREADS IMMEDIATELY
             auth_state["last_checked"] = datetime.now(timezone.utc).isoformat()
             auth_state["pending_persona_url"] = None
             auth_state["pending_api_persona_url"] = None

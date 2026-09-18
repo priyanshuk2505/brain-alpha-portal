@@ -1008,10 +1008,13 @@ def worker_slot(slot_id):
 
             res = run_single_simulation(expression, settings, dry_run=dry_run, slot_id=slot_id)
 
-            # Auto-submit check
+            # Auto-submit check — only submit if Sharpe >= 0.5 and no PROD_CORRELATION or SELF_CORRELATION failures
             metrics = res.get("metrics") or {}
             sharpe = float(metrics.get("sharpe", 0.0))
-            if auto_submit and res.get("status") in ["SUCCESS", "CACHED_DUPLICATE"] and sharpe >= 0.5:
+            failed_checks = res.get("failed_checks", [])
+            has_corr_fail = any(kw in str(fc).upper() for fc in failed_checks for kw in ["PROD_CORRELATION", "SELF_CORRELATION"])
+
+            if auto_submit and res.get("status") in ["SUCCESS", "CACHED_DUPLICATE"] and sharpe >= 0.5 and not has_corr_fail:
                 alpha_id = res.get("alpha_id")
                 if alpha_id:
                     sub_ok, sub_msg = submit_alpha_to_brain(alpha_id, dry_run=dry_run)

@@ -34,7 +34,7 @@ if not IND_FIELDS:
 if not ASI_FIELDS:
     ASI_FIELDS = GENERIC_FIELDS
 
-GROUPS = ["industry", "subindustry", "sector"]
+GROUPS = ["subindustry", "subindustry", "industry"]
 BUCKET_SIGNALS = ["cap", "returns", "volume", "vwap", "roe"]
 RISK_FACTORS = ["volume", "cap", "returns", "vwap", "high", "low"]
 

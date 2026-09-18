@@ -834,8 +834,57 @@ def log_result_to_csv(result, expression, settings):
                         w.writerow(["AlphaID", "Sharpe", "Fitness", "Returns(%)", "Margin(bps)", "Turnover(%)", "Universe", "Region", "Neutralization", "Expression"])
                     w.writerow([result.get('alpha_id', 'N/A'), s_val, f_val, returns, margin, turnover, universe, region, neutralization, expression])
                 print(f"[SUBMITABLE] Saved submitable alpha: {result.get('alpha_id')} (Sharpe {s_val:.2f})")
+        
+        # Check for Region-Agnostic GLB logging
+        if region == "GLB" or settings.get("region") == "GLB":
+            log_region_agnostic_result(result, expression, settings)
     except Exception as e:
         print(f"Error logging to CSV: {e}")
+
+REGION_AGNOSTIC_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "region_agnostic_alpha_results.csv")
+
+def log_region_agnostic_result(result, expression, settings, orig_sharpe=None):
+    try:
+        metrics = result.get("metrics") or {}
+        s_val = float(metrics.get("sharpe", 0.0))
+        f_val = float(metrics.get("fitness", 0.0))
+        r_val = float(metrics.get("returns", 0.0))
+        m_val = float(metrics.get("margin", 0.0))
+        t_val = float(metrics.get("turnover", 0.0))
+        fc = result.get("failed_checks", [])
+        fc_str = ";".join(fc) if fc else "NONE"
+        status = result.get("status", "UNKNOWN")
+        
+        pass_fail = "PASS" if (s_val >= 1.25 and not fc and status in ["SUCCESS", "CACHED_DUPLICATE"]) else "FAIL"
+        
+        file_exists = os.path.exists(REGION_AGNOSTIC_CSV)
+        with open(REGION_AGNOSTIC_CSV, "a", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            if not file_exists:
+                w.writerow(["Index", "OriginalSharpe", "GLB_Sharpe", "GLB_Fitness", "GLB_Returns(%)", "GLB_Margin(bps)", "GLB_Turnover(%)", "FailedChecks", "PassFail", "AlphaID", "Expression"])
+            
+            row_idx = 1
+            if file_exists:
+                with open(REGION_AGNOSTIC_CSV, "r", encoding="utf-8") as rf:
+                    row_idx = max(1, len(rf.readlines()))
+            
+            w.writerow([
+                row_idx,
+                orig_sharpe if orig_sharpe is not None else "N/A",
+                s_val,
+                f_val,
+                r_val,
+                round(m_val * 10000, 2),
+                t_val,
+                fc_str,
+                pass_fail,
+                result.get("alpha_id", "N/A"),
+                expression
+            ])
+            print(f"[REGION-AGNOSTIC LOG] Saved GLB result: Sharpe={s_val:.2f}, Result={pass_fail}, AlphaID={result.get('alpha_id')}")
+    except Exception as e:
+        print(f"Error logging to region_agnostic_alpha_results.csv: {e}")
+
 
 BATCH_RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch_results")
 os.makedirs(BATCH_RESULTS_DIR, exist_ok=True)
@@ -1119,6 +1168,29 @@ def get_system_health():
         "running_batches": running,
         "rate_limit": rate_limit_state
     })
+
+@app.route("/api/results/region-agnostic", methods=["GET"])
+def get_region_agnostic_results():
+    filepath = os.path.join(WORKSPACE_DIR, "region_agnostic_alpha_results.csv")
+    if not os.path.exists(filepath):
+        return jsonify({"results": [], "total": 0})
+    rows = []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                rows.append(r)
+    except Exception as e:
+        print(f"Error reading region_agnostic_alpha_results.csv: {e}")
+    return jsonify({"results": rows, "total": len(rows)})
+
+@app.route("/download/region-agnostic", methods=["GET"])
+def download_region_agnostic_csv():
+    filepath = os.path.join(WORKSPACE_DIR, "region_agnostic_alpha_results.csv")
+    if os.path.exists(filepath):
+        return send_file(filepath, as_attachment=True, download_name="region_agnostic_alpha_results.csv")
+    return jsonify({"error": "No region agnostic results file found"}), 404
+
 
 
 @app.route("/api/auth/login", methods=["POST"])

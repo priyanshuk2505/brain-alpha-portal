@@ -13,12 +13,11 @@ BATCH_JOBS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batc
 
 REGIONS = [
     ("CHN", "TOP2000U", 1),
-    ("DEU", "TOP500", 0),
-    ("GBR", "TOP500", 0),
     ("USA", "TOP3000", 1),
     ("EUR", "TOP2500", 1),
     ("JPN", "TOP1000", 0),
-    ("ASI", "TOP1000", 1)
+    ("ASI", "TOP1000", 1),
+    ("IND", "TOP500", 1)
 ]
 
 OPERATORS = ["ts_rank", "ts_zscore", "rank", "zscore", "ts_delta", "group_rank", "group_zscore", "ts_std_dev", "ts_mean"]

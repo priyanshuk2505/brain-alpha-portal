@@ -1099,6 +1099,31 @@ def get_rate_limit():
     """Return current rate limit state from last simulation POST."""
     return jsonify(rate_limit_state)
 
+@app.route("/api/health", methods=["GET"])
+def get_system_health():
+    """System health endpoint for background platform and WorldQuant error monitoring."""
+    with jobs_lock:
+        remaining = 0
+        running = 0
+        for b in batch_jobs.values():
+            if isinstance(b, dict):
+                if b.get("status") in ["RUNNING", "PENDING"]:
+                    running += 1
+                    tot = b.get("total", 0)
+                    comp = b.get("completed", 0)
+                    remaining += max(0, tot - comp)
+
+    return jsonify({
+        "status": "OK" if auth_state.get("authenticated") else "AUTH_REQUIRED",
+        "authenticated": bool(auth_state.get("authenticated")),
+        "user_email": auth_state.get("user_email"),
+        "pending_persona_url": auth_state.get("pending_persona_url"),
+        "remaining_queue": remaining,
+        "running_batches": running,
+        "rate_limit": rate_limit_state
+    })
+
+
 @app.route("/api/auth/login", methods=["POST"])
 def login_auth():
     data = request.get_json() or {}

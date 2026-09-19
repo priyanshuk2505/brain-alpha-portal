@@ -505,7 +505,7 @@ def _build_sim_payload(expression, settings):
         "neutralization": neut,
         "truncation": float(settings.get("truncation", 0.08)),
         "pasteurization": settings.get("pasteurization", "ON"),
-        "nanHandling": settings.get("nanHandling", "OFF"),
+        "nanHandling": "ON" if str(settings.get("nanHandling", "")).upper() == "ON" else "OFF",
         "language": settings.get("language", "FASTEXPR"),
         "unitHandling": settings.get("unitHandling", "VERIFY"),
         "visualization": False,

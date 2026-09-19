@@ -1080,7 +1080,8 @@ def auto_replenish_loop():
                         if isinstance(b_data, dict) and b_data.get("status") in ["RUNNING", "PENDING"]:
                             items = b_data.get("items", [])
                             for task_idx, item_obj in enumerate(items):
-                                if item_obj.get("status") in ["QUEUED", "PENDING"]:
+                                if item_obj.get("status") in ["QUEUED", "SIMULATING", "PENDING"]:
+                                    item_obj["status"] = "QUEUED"
                                     job_queue.put((b_id, task_idx, item_obj))
                                     re_count += 1
                     if re_count > 0:

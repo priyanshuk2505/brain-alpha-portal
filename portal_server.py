@@ -961,7 +961,7 @@ def worker_slot(slot_id):
         job_item = job_queue.get()
         if job_item is None:
             job_queue.task_done()
-            break
+            continue
 
         batch_id, item_index, item = job_item
 
@@ -1085,6 +1085,17 @@ def auto_replenish_loop():
                                     re_count += 1
                     if re_count > 0:
                         print(f"[QUEUE-RECOVERY] Re-enqueued {re_count} QUEUED items into in-memory job_queue.")
+
+                # Ensure all 8 worker threads are alive
+                for sid in range(MAX_CONCURRENT_SIMS):
+                    if sid >= len(worker_threads) or not worker_threads[sid].is_alive():
+                        t = threading.Thread(target=worker_slot, args=(sid,), daemon=True)
+                        t.start()
+                        if sid < len(worker_threads):
+                            worker_threads[sid] = t
+                        else:
+                            worker_threads.append(t)
+                        print(f"[WORKER-HEALTH] Respawned dead worker thread for slot {sid+1}")
 
                 # 2. Check overall remaining total for auto-replenish
                 remaining_total = 0

@@ -983,6 +983,15 @@ def worker_slot(slot_id):
         auto_submit = item.get("auto_submit", False)
         region = settings.get("region", "USA")
 
+        # Mark slot as waiting for API lock
+        with slot_lock:
+            slot_status[slot_id].update({
+                "status": "WAITING_LOCK",
+                "expression": expression[:80] + ("..." if len(expression) > 80 else ""),
+                "batch_id": batch_id,
+                "item_index": item_index
+            })
+
         # Acquire concurrency lock across all regions (max 2 active at once)
         brain_sim_semaphore.acquire()
 

@@ -927,6 +927,9 @@ def save_batch_csv(batch_id):
 # load_auth_credentials() calls _apply_session_cookie() which requires
 # _brain_session to exist \u2014 which it does by line 132 above.
 load_auth_credentials()
+if auth_state.get("cookie"):
+    auth_state["authenticated"] = True
+    auth_pause_event.set()
 print(f"[STARTUP] Auth state: email={auth_state.get('user_email')} cookie={'SET' if auth_state.get('cookie') else 'NONE'}")
 
 # -----------------------------------------------------------------------------
@@ -1172,6 +1175,11 @@ def update_auth():
         auth_state["cookie"] = new_cookie.strip()
         _apply_session_cookie(new_cookie.strip())  # Apply to persistent session
         ok, details = check_auth_status()
+        if ok:
+            auth_state["authenticated"] = True
+            auth_state["pending_persona_url"] = None
+            auth_pause_event.set()  # UNPAUSE ALL 8 WORKER THREADS IMMEDIATELY
+            print("[AUTH] Cookie updated & verified! Unpaused all worker slots.")
         return jsonify({"success": ok, "details": details, "user_email": auth_state["user_email"]})
     return jsonify({"success": False, "error": "No cookie string provided"}), 400
 

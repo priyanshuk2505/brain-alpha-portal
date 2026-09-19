@@ -931,9 +931,15 @@ print(f"[STARTUP] Auth state: email={auth_state.get('user_email')} cookie={'SET'
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
-# Background Queue Worker — 8 Parallel Slots (GLB capped at 4, USA/Others 8)
-# Global WorldQuant API concurrency limiter (max 2 active simulations across all slots)
+MAX_CONCURRENT_SIMS = 8
 brain_sim_semaphore = threading.BoundedSemaphore(2)
+
+# Shared cancel event — set to stop all in-flight simulations & drain queue
+cancel_event = threading.Event()
+
+# Per-slot live status tracking (slot_id -> dict)
+slot_status = {i: {"slot": i + 1, "status": "IDLE", "expression": None, "batch_id": None, "item_index": None, "start_time": None, "sim_id": None} for i in range(MAX_CONCURRENT_SIMS)}
+slot_lock = threading.Lock()
 
 def worker_slot(slot_id):
     """Each slot runs as a permanent daemon thread, pulling from job_queue."""

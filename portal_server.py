@@ -996,9 +996,9 @@ def worker_slot(slot_id):
             })
 
         # Acquire concurrency lock across all regions (max 2 active at once)
-        brain_sim_semaphore.acquire()
-
+        acquired = False
         try:
+            acquired = brain_sim_semaphore.acquire(timeout=60)
             # Mark slot as busy
             with slot_lock:
                 slot_status[slot_id].update({
@@ -1032,7 +1032,11 @@ def worker_slot(slot_id):
 
             log_result_to_csv(res, expression, settings)
         finally:
-            brain_sim_semaphore.release()
+            if acquired:
+                try:
+                    brain_sim_semaphore.release()
+                except Exception:
+                    pass
 
         with jobs_lock:
             if batch_id in batch_jobs:

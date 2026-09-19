@@ -1369,6 +1369,8 @@ def clean_single_expression(expr_str):
 
 @app.route("/api/simulations/batch", methods=["POST"])
 def enqueue_batch():
+    global cancel_event
+    cancel_event.clear()  # Ensure cancel flag is cleared when new batch is enqueued
     data = request.get_json() or {}
     raw_expressions = data.get("expressions", [])
     settings = data.get("settings", {})

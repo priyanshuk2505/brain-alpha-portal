@@ -1612,19 +1612,22 @@ def get_batches():
     with jobs_lock:
         summary_list = []
         for b_id, b_data in batch_jobs.items():
-            # Count how many are actively running in slots
-            simulating_count = sum(1 for item in b_data.get("items", []) if item.get("status") == "SIMULATING")
+            if not isinstance(b_data, dict):
+                continue
+            simulating_count = sum(1 for item in b_data.get("items", []) if isinstance(item, dict) and item.get("status") == "SIMULATING")
+            total = b_data.get("total", 0)
+            completed = b_data.get("completed", 0)
             summary_list.append({
                 "batch_id": b_id,
-                "created_at": b_data["created_at"],
-                "total": b_data["total"],
-                "completed": b_data["completed"],
-                "progress": b_data["progress"],
-                "status": b_data["status"],
-                "dry_run": b_data["dry_run"],
-                "settings": b_data["settings"],
+                "created_at": b_data.get("created_at", ""),
+                "total": total,
+                "completed": completed,
+                "progress": b_data.get("progress", 0.0),
+                "status": b_data.get("status", "UNKNOWN"),
+                "dry_run": b_data.get("dry_run", False),
+                "settings": b_data.get("settings", {}),
                 "simulating_now": simulating_count,
-                "queued_remaining": b_data["total"] - b_data["completed"] - simulating_count
+                "queued_remaining": max(0, total - completed - simulating_count)
             })
         return jsonify(summary_list)
 

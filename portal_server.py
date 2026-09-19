@@ -1068,11 +1068,25 @@ if loaded_batch_jobs:
     print(f"[BATCH] Restored {len(batch_jobs)} batch jobs from disk, re-enqueued pending items into worker queue.")
 
 def auto_replenish_loop():
-    """Background daemon thread to auto-replenish queue with 1,000 Alphas whenever remaining queue < 1,000."""
+    """Background daemon thread to auto-replenish queue and maintain active job_queue."""
     while True:
         try:
-            time.sleep(60)
+            time.sleep(15)
             with jobs_lock:
+                # 1. If job_queue in memory is empty, re-enqueue all QUEUED items from active batches
+                if job_queue.empty():
+                    re_count = 0
+                    for b_id, b_data in batch_jobs.items():
+                        if isinstance(b_data, dict) and b_data.get("status") in ["RUNNING", "PENDING"]:
+                            items = b_data.get("items", [])
+                            for task_idx, item_obj in enumerate(items):
+                                if item_obj.get("status") in ["QUEUED", "PENDING"]:
+                                    job_queue.put((b_id, task_idx, item_obj))
+                                    re_count += 1
+                    if re_count > 0:
+                        print(f"[QUEUE-RECOVERY] Re-enqueued {re_count} QUEUED items into in-memory job_queue.")
+
+                # 2. Check overall remaining total for auto-replenish
                 remaining_total = 0
                 for b in batch_jobs.values():
                     if isinstance(b, dict) and b.get("status") in ["RUNNING", "PENDING"]:
